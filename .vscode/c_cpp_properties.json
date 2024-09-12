@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Linux GCC",
+            "includePath": [
+                "${workspaceFolder}"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu99",
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerArgs": [
+                "-g",
+                "-std=gnu99",
+                "-Wall",
+                "-lncurses"
+            ]
+        }
+    ],
+    "version": 4
+}

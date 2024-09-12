@@ -1,0 +1,24 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Make main",
+            "command": "/usr/bin/make",
+            "args": [
+                "--always-make",
+                "main"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": ["relative", "${workspaceFolder}"]
+            },
+            "group": {
+                "kind": "build"
+            }
+        }
+    ],
+    "version": "2.0.0"
+}
