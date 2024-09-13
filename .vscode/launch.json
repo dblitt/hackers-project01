@@ -5,15 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch main",
+            "name": "(gdb) Launch sysmonitor",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/main",
+            "program": "${workspaceFolder}/sysmonitor",
             "args": [],
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
-            "preLaunchTask": "Make main",
+            "preLaunchTask": "Make sysmonitor",
             "MIMode": "gdb",
             "setupCommands": [
                 {

@@ -2,15 +2,8 @@
 #include <stdint.h>
 #include <unistd.h>
 
-/**
- * @brief Reads CPU statistics from /proc/stat and calculates the CPU
- * load by comparing idle and total times between two intervals.
- *
- * @return CPU load as a float between 0.0 (0%) and 1.0 (100%).
- * Returns -1.0 on error (e.g., unable to read /proc/stat).
- *
- * @param ms_interval amount of time to wait between readings in ms
- */
+#include "cpuusage.h"
+
 float get_cpu_load(int ms_interval) {
     FILE *file;
     uint64_t user, nice, system, idle, iowait, irq, softirq, steal;
@@ -79,13 +72,63 @@ float get_cpu_load(int ms_interval) {
     return cpu_load; // This will return a value between 0.0 (0%) and 1.0 (100%)
 }
 
-int main() {
-    float cpu_load = get_cpu_load(100);
+int get_mem_info(MemInfo *mem_info) {
+    FILE *file = fopen("/proc/meminfo", "r");
+    if (file == NULL) {
+        perror("Failed to open /proc/meminfo");
+        return -1;
+    }
 
-    if (cpu_load >= 0.0f) {
-        printf("CPU Load: %.2f%%\n", cpu_load * 100.0f);
+    char line[256];
+    int fields_found = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "MemTotal:", 9) == 0) {
+            sscanf(line + 9, "%lld", &mem_info->total_mem);
+            fields_found++;
+        } else if (strncmp(line, "MemFree:", 8) == 0) {
+            sscanf(line + 8, "%lld", &mem_info->free_mem);
+            fields_found++;
+        } else if (strncmp(line, "Shmem:", 6) == 0) {
+            sscanf(line + 6, "%lld", &mem_info->shared_mem);
+            fields_found++;
+        } else if (strncmp(line, "MemAvailable:", 13) == 0) {
+            sscanf(line + 13, "%lld", &mem_info->available_mem);
+            fields_found++;
+        } else if (strncmp(line, "Buffers:", 8) == 0) {
+            sscanf(line + 8, "%lld", &mem_info->buffers_mem);
+            fields_found++;
+        } else if (strncmp(line, "Cached:", 7) == 0) {
+            sscanf(line + 7, "%lld", &mem_info->cached_mem);
+            fields_found++;
+        } else if (strncmp(line, "SwapTotal:", 10) == 0) {
+            sscanf(line + 10, "%lld", &mem_info->total_swap);
+            fields_found++;
+        } else if (strncmp(line, "SwapFree:", 9) == 0) {
+            sscanf(line + 9, "%lld", &mem_info->free_swap);
+            fields_found++;
+        }
+    }
+
+    fclose(file);
+
+    if (fields_found < 7) {
+        fprintf(stderr, "Error: Could not parse all required fields from /proc/meminfo\n");
+        return -1;
+    }
+
+    // Calculate used memory
+    mem_info->used_mem = mem_info->total_mem - mem_info->free_mem;// - mem_info->buffers_mem - mem_info->cached_mem;
+    
+    // Calculate used swap
+    mem_info->used_swap = mem_info->total_swap - mem_info->free_swap;
+
+    // Calculate percentages
+    mem_info->mem_in_use_percent = 100.0 * (float)mem_info->used_mem / (float)mem_info->total_mem;
+    if (mem_info->total_swap > 0) {
+        mem_info->swap_in_use_percent = 100.0 * (float)mem_info->used_swap / (float)mem_info->total_swap;
     } else {
-        printf("Failed to calculate CPU load.\n");
+        mem_info->swap_in_use_percent = 0.0;
     }
 
     return 0;

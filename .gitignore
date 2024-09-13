@@ -1,0 +1,4 @@
+*.o
+main
+cpuusage_main
+sysmonitor

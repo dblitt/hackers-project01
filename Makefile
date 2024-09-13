@@ -1,10 +1,18 @@
 CC = gcc
-CFLAGS = -g -Wall -std=gnu99 -lncurses
+LD = gcc
+CFLAGS = -g -Wall -std=gnu99
+LDFLAGS = -lncurses
 
-TARGETS = main
+TARGETS = sysmonitor cpuusage_main
 
 all: $(TARGETS)
 
+sysmonitor: sysmonitor.o cpuusage.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
+cpuusage_main: cpuusage_main.o cpuusage.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
 clean:
 	@echo Cleaning...
-	rm $(TARGETS)
+	rm $(TARGETS) *.o

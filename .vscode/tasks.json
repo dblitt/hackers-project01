@@ -2,11 +2,11 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "Make main",
+            "label": "Make sysmonitor",
             "command": "/usr/bin/make",
             "args": [
                 "--always-make",
-                "main"
+                "sysmonitor"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
