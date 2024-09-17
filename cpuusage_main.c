@@ -28,5 +28,19 @@ int main() {
     printf("available mem %lld MB\n", mem_info.available_mem / 1024);
     printf("total - available mem %lld MB\n", (mem_info.total_mem - mem_info.available_mem) / 1024);
 
+    printf("getting load for all cpu cores\n");
+    cpu_load_info_t *info = get_cpu_load_info();
+
+    if (info) {
+        printf("Number of CPU cores: %d\n", info->num_cores);
+        for (int i = 0; i < info->num_cores; i++) {
+            printf("CPU %d Load: %.2f%%\n", i, info->loads[i] * 100.0f);
+        }
+
+        free_cpu_load_info(info);
+    } else {
+        printf("Failed to retrieve CPU load information.\n");
+    }
+
     return 0;
 }

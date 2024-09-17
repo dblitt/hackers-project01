@@ -18,6 +18,25 @@
             "group": {
                 "kind": "build"
             }
+        },
+        {
+            "type": "shell",
+            "label": "Make cpuusage_main",
+            "command": "/usr/bin/make",
+            "args": [
+                "--always-make",
+                "cpuusage_main"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": {
+                "base": "$gcc",
+                "fileLocation": ["relative", "${workspaceFolder}"]
+            },
+            "group": {
+                "kind": "build"
+            }
         }
     ],
     "version": "2.0.0"

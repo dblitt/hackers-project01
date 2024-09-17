@@ -42,4 +42,26 @@ typedef struct {
  */
 int get_mem_info(MemInfo *mem_info);
 
+typedef struct {
+    int num_cores;   /**< Number of CPU cores */
+    float *loads;    /**< Array of CPU load percentages (0.0 to 1.0) for each core */
+} cpu_load_info_t;
+
+/**
+ * @brief Frees the memory associated with a cpu_load_info_t structure.
+ * 
+ * @param info Pointer to the cpu_load_info_t structure to free.
+ */
+void free_cpu_load_info(cpu_load_info_t *info);
+
+/**
+ * @brief Retrieves CPU load information for all cores.
+ * 
+ * Allocates and returns a structure containing the number of cores and an array
+ * of CPU load percentages. The user must call free_cpu_load_info() to release memory.
+ * 
+ * @return cpu_load_info_t* A pointer to the cpu_load_info_t structure, or NULL on error.
+ */
+cpu_load_info_t* get_cpu_load_info();
+
 #endif
