@@ -7,7 +7,7 @@
 #define MEM_TOTAL 8000
 
 void draw_memory_bar(int y, int x, float mem_usage, const char *label);
-void draw_cpu_bars(int y, int x, float cpu_usages[CPU_CORES]);
+void draw_cpu_bars(int y, int x, float *cpu_usages, int num_cores);
 
 int main() {
     initscr();
@@ -43,9 +43,14 @@ int main() {
     while (1) {
         ch = getch();
         if (ch == 'q') break;  // Exit loop on 'q'
-        // Simulate random CPU and memory usage for demo purposes
-        for (int i = 0; i < CPU_CORES; i++) {
-            cpu_usages[i] = get_cpu_load(i);
+
+        // Get CPU load information
+        cpu_load_info_t *info = get_cpu_load_info();
+        if (info == NULL) {
+            mvprintw(0, 0, "Failed to retrieve CPU load information.");
+            refresh();
+            sleep(1);
+            continue;
         }
         
         // Get memory information
@@ -62,7 +67,7 @@ int main() {
         mvprintw(2, 0, "Uptime: 12:34:56");                     // Replace with actual system uptime if available
 
         // Draw CPU usage bars
-        draw_cpu_bars(4, 2, cpu_usages);
+        draw_cpu_bars(4, 2, info->loads, info->num_cores);
 
         // Draw memory usage bar
         draw_memory_bar(CPU_CORES + 6, 2, mem_usage, "Mem");
@@ -79,6 +84,8 @@ int main() {
         mvprintw(CPU_CORES + 15, 2, "Used Swap: %lld MB", mem_info.used_swap / 1024);
 
         refresh();  // Update the screen
+
+        free_cpu_load_info(info);
 
         sleep(1);  // Update every second
     }
@@ -134,8 +141,8 @@ int main() {
 
 
 // Function to draw CPU usage bars
-void draw_cpu_bars(int y, int x, float cpu_usages[CPU_CORES]) {
-    for (int i = 0; i < CPU_CORES; i++) {
+void draw_cpu_bars(int y, int x, float *cpu_usages, int num_cores) {
+    for (int i = 0; i < num_cores; i++) {
         mvprintw(y + i, x, "CPU %d: ", i);
         int usage_bar = (int)(cpu_usages[i] * 50); // Scale usage to fit bar
         attron(COLOR_PAIR(1));
