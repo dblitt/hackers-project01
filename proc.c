@@ -1,152 +1,163 @@
-#include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ncurses.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <ctype.h>
 #include <string.h>
-#include <unistd.h>
-#include <pwd.h>
 
-// Define a limit for how many processes you can display
 #define MAX_PROCESSES 1024
+#define DISPLAY_ROWS 20  // Number of rows for displaying processes
 
-// Structure to hold process information
 typedef struct {
-    char pid[10];
-    char user[64];
-    char comm[256];
-    char state;
+    int pid;
+    char name[256];
+    float cpu_usage;
+    long memory;
 } ProcessInfo;
 
-// Function to get process owner (username) by UID
-char* get_username(uid_t uid) {
-    struct passwd *pw = getpwuid(uid);
-    if (pw) {
-        return pw->pw_name;
-    }
-    return "unknown";
+// Function to calculate CPU usage of the process
+float get_cpu_usage(int pid) {
+    char path[64], buffer[256];
+    snprintf(path, 64, "/proc/%d/stat", pid);
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) return 0.0;
+
+    long utime, stime;
+    fscanf(fp, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %ld %ld", &utime, &stime);
+    fclose(fp);
+
+    return (float)(utime + stime) / sysconf(_SC_CLK_TCK);
 }
 
-// Function to get the list of processes
-int get_process_info(ProcessInfo processes[], int max_processes) {
-    DIR *dir;
-    struct dirent *entry;
-    FILE *fp;
-    char path[256], line[1024], uid_str[10];
-    int ppid, uid;
-    int process_count = 0;
+// Function to calculate memory usage of the process
+long get_memory_usage(int pid) {
+    char path[64], buffer[256];
+    snprintf(path, 64, "/proc/%d/status", pid);
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) return 0;
 
-    // Open the /proc directory
-    dir = opendir("/proc");
+    while (fgets(buffer, sizeof(buffer), fp)) {
+        if (strncmp(buffer, "VmRSS:", 6) == 0) {
+            long memory;
+            sscanf(buffer + 7, "%ld", &memory);
+            fclose(fp);
+            return memory;  // Return memory in kilobytes
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+// Function to display process info with scrolling
+void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start) {
+    int row = 1;
+
+    wattron(win, A_BOLD | COLOR_PAIR(1));  // Bold and colored header
+    mvwprintw(win, 0, 1, "PID      NAME             CPU(%%)   MEMORY(KB)");
+    wattroff(win, A_BOLD | COLOR_PAIR(1));
+
+    for (int i = start; i < num_processes && row < DISPLAY_ROWS; i++) {
+        if (processes[i].cpu_usage > 50.0) {  // Highlight high CPU usage in red
+            wattron(win, COLOR_PAIR(2));
+        }
+        mvwprintw(win, row, 1, "%-8d %-16s %-8.2f %-12ld", processes[i].pid, processes[i].name, processes[i].cpu_usage, processes[i].memory);
+        wattroff(win, COLOR_PAIR(2));
+        row++;
+    }
+    wrefresh(win);
+}
+
+// Function to read process information
+int read_process_info(ProcessInfo *processes) {
+    DIR *dir = opendir("/proc");
     if (dir == NULL) {
-        perror("opendir(/proc)");
+        perror("opendir() error");
         return 0;
     }
 
-    // Iterate through each entry in /proc directory
-    while ((entry = readdir(dir)) != NULL && process_count < max_processes) {
-        // Only process directories with numeric names (which are process IDs)
-        if (isdigit(*entry->d_name)) {
-            strcpy(processes[process_count].pid, entry->d_name);
-            snprintf(path, sizeof(path), "/proc/%s/stat", processes[process_count].pid);
+    struct dirent *entry;
+    int num_processes = 0;
 
-            // Open the /proc/[pid]/stat file
-            fp = fopen(path, "r");
-            if (fp == NULL) {
-                continue;
-            }
+    while ((entry = readdir(dir)) != NULL) {
+        if (isdigit(entry->d_name[0])) {
+            int pid = atoi(entry->d_name);
+            snprintf(processes[num_processes].name, sizeof(processes[num_processes].name), "/proc/%d/stat", pid);
 
-            // Read the relevant process information from the stat file
-            fscanf(fp, "%d %s %c", &ppid, processes[process_count].comm, &processes[process_count].state);
+            // Open the stat file to get the process name
+            FILE *fp = fopen(processes[num_processes].name, "r");
+            if (fp == NULL) continue;
+
+            fscanf(fp, "%d %s", &processes[num_processes].pid, processes[num_processes].name);
             fclose(fp);
 
-            // Get the UID and username from /proc/[pid]/status
-            snprintf(path, sizeof(path), "/proc/%s/status", processes[process_count].pid);
-            fp = fopen(path, "r");
-            if (fp) {
-                while (fgets(line, sizeof(line), fp)) {
-                    if (strncmp(line, "Uid:", 4) == 0) {
-                        sscanf(line, "Uid:\t%d", &uid);
-                        break;
-                    }
-                }
-                fclose(fp);
-                strcpy(processes[process_count].user, get_username(uid));
-            } else {
-                strcpy(processes[process_count].user, "unknown");
-            }
+            processes[num_processes].cpu_usage = get_cpu_usage(pid);
+            processes[num_processes].memory = get_memory_usage(pid);
 
-            process_count++;
+            num_processes++;
+            if (num_processes >= MAX_PROCESSES) break;  // Limit max processes to prevent overflow
         }
     }
 
     closedir(dir);
-    return process_count;
+    return num_processes;
+}
+
+// Initialize color pairs for ncurses
+void init_colors() {
+    start_color();
+    init_pair(1, COLOR_CYAN, COLOR_BLACK);  // Cyan text for headers
+    init_pair(2, COLOR_RED, COLOR_BLACK);   // Red text for high CPU usage
+    init_pair(3, COLOR_GREEN, COLOR_BLACK); // Green text for normal processes
 }
 
 int main() {
-    ProcessInfo processes[MAX_PROCESSES];
-    int num_processes, display_limit, start_index = 0;
-    int ch;
-    
     // Initialize ncurses
     initscr();
-    noecho();        // Don't echo typed characters
-    curs_set(FALSE); // Hide the cursor
-    keypad(stdscr, TRUE); // Enable arrow keys
+    noecho();
+    cbreak();
+    curs_set(FALSE);
+    keypad(stdscr, TRUE);  // Enable keyboard input
+    timeout(1000);  // Set a timeout for getch
 
-    // Main loop to capture input and display the process list
+    // Initialize color support
+    if (has_colors()) {
+        init_colors();
+    }
+
+    WINDOW *proc_win = newwin(DISPLAY_ROWS, 80, 0, 0);
+
+    ProcessInfo processes[MAX_PROCESSES];
+    int start = 0;  // Variable for scrolling through the list
+    int num_processes = 0;  // Total number of processes
+
     while (1) {
-        clear();    // Clear the screen
+        // Read process info
+        num_processes = read_process_info(processes);
 
-        // Fetch and store process information
-        num_processes = get_process_info(processes, MAX_PROCESSES);
-        
-        // Calculate how many processes fit in the window (excluding header)
-        display_limit = LINES - 3;
-
-        // Display the table header
-        printw("%-10s %-10s %-20s %-10s\n", "PID", "USER", "Process Name", "State");
-        printw("------------------------------------------------------------\n");
-
-        // Display the process list from start_index
-        for (int i = start_index; i < num_processes && i < start_index + display_limit; i++) {
-            printw("%-10s %-10s %-20s %-10c\n", 
-                   processes[i].pid, 
-                   processes[i].user, 
-                   processes[i].comm, 
-                   processes[i].state);
+        // Sort processes by CPU usage (optional)
+        for (int i = 0; i < num_processes - 1; i++) {
+            for (int j = 0; j < num_processes - i - 1; j++) {
+                if (processes[j].cpu_usage < processes[j + 1].cpu_usage) {
+                    ProcessInfo temp = processes[j];
+                    processes[j] = processes[j + 1];
+                    processes[j + 1] = temp;
+                }
+            }
         }
 
-        refresh();  // Refresh the screen to update the displayed info
+        // Display process information in the window
+        display_process_info(proc_win, processes, num_processes, start);
 
-        // Capture user input for scrolling
-        ch = getch();
-        switch (ch) {
-            case 'q': // Quit the program
-                endwin();
-                exit(0);
-                break;
-            case KEY_UP: // Scroll up
-                if (start_index > 0) {
-                    start_index--;
-                }
-                break;
-            case KEY_DOWN: // Scroll down
-                if (start_index + display_limit < num_processes) {
-                    start_index++;
-                }
-                break;
-            default:
-                break;
-        }
-
-        // Sleep for a brief time before refreshing again
-        usleep(100000); // 0.1 second delay
+        // Scroll through processes with arrow keys or 'j' and 'k'
+        int ch = getch();
+        if (ch == 'q') break;  // Press 'q' to quit
+        else if ((ch == KEY_DOWN || ch == 'j') && start + DISPLAY_ROWS < num_processes) start++;  // Scroll down
+        else if ((ch == KEY_UP || ch == 'k') && start > 0) start--;  // Scroll up
     }
 
     // End ncurses mode
     endwin();
     return 0;
 }
-
