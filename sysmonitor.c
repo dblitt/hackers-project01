@@ -1,12 +1,12 @@
 #include <ncurses.h>
 #include <unistd.h> 
 #include <stdlib.h>  
-//#include "cpuusage.c"
+#include "cpuusage.h"
 
-#define CPU_CORES 4
+#define CPU_CORES 32
 #define MEM_TOTAL 8000
 
-void draw_memory_bar(int y, int x, float mem_usage);
+void draw_memory_bar(int y, int x, float mem_usage, const char *label);
 void draw_cpu_bars(int y, int x, float cpu_usages[CPU_CORES]);
 
 int main() {
@@ -14,49 +14,69 @@ int main() {
     raw();
     keypad(stdscr, true);
     noecho();
+    nodelay(stdscr, TRUE);
     int height, width;
     getmaxyx(stdscr, height, width);
+    int ch;
 
     start_color();          // Enable color
     init_pair(1, COLOR_GREEN, COLOR_BLACK); // Color for CPU bars: init_pair(pair_number, foreground_color, background_color)
     init_pair(2, COLOR_BLUE, COLOR_BLACK);  // Color for memory bars
+    init_pair(3, COLOR_RED, COLOR_BLACK); // Color for swap bars
 
     // Simulated data (replace this with actual system data)
     float cpu_usages[CPU_CORES];
-    float mem_usage;
+    float mem_usage, swap_usage;
 
-    int top_height = height / 4;
-    int middle_height = height / 2;
-    int bottom_height = height - (top_height + middle_height);
+    //int top_height = height / 4;
+    //int middle_height = height / 2;
+    //int bottom_height = height - (top_height + middle_height);
 
-    WINDOW *top_win = newwin(top_height, width, 0, 0);                 // Top window
-    WINDOW *middle_win = newwin(middle_height, width, top_height, 0);  // Middle window
-    WINDOW *bottom_win = newwin(bottom_height, width, top_height + middle_height, 0);  // Bottom window
+    //WINDOW *top_win = newwin(top_height, width, 0, 0);                 // Top window
+    //WINDOW *middle_win = newwin(middle_height, width, top_height, 0);  // Middle window
+    //WINDOW *bottom_win = newwin(bottom_height, width, top_height + middle_height, 0);  // Bottom window
     
-    box(top_win, 0, 0);
-    box(middle_win, 0, 0);
-    box(bottom_win, 0, 0);
+    //box(top_win, 0, 0);
+    //box(middle_win, 0, 0);
+    //box(bottom_win, 0, 0);
 
     while (1) {
+        ch = getch();
+        if (ch == 'q') break;  // Exit loop on 'q'
         // Simulate random CPU and memory usage for demo purposes
         for (int i = 0; i < CPU_CORES; i++) {
-            cpu_usages[i] = (float)(rand() % 100) / 100.0;
+            cpu_usages[i] = get_cpu_load(i);
         }
         
-        mem_usage = (float)(rand() % 100) / 100.0;
+        // Get memory information
+        MemInfo mem_info;
+        get_mem_info(&mem_info);
+        mem_usage = (float)mem_info.used_mem / (float)mem_info.total_mem;
+        swap_usage = (float)mem_info.used_swap / (float)mem_info.total_swap;
 
         clear();  // Clear the screen before updating
 
+        // Display task summary and load averages (mocked for now)
+        mvprintw(0, 0, "Tasks: %d total, %d running", 145, 3);  // Replace with actual task data if available
+        mvprintw(1, 0, "Load average: 0.25, 0.20, 0.10");       // Replace with actual load averages
+        mvprintw(2, 0, "Uptime: 12:34:56");                     // Replace with actual system uptime if available
+
         // Draw CPU usage bars
-        draw_cpu_bars(2, 2, cpu_usages);
+        draw_cpu_bars(4, 2, cpu_usages);
 
         // Draw memory usage bar
-        draw_memory_bar(CPU_CORES + 4, 2, mem_usage);
+        draw_memory_bar(CPU_CORES + 6, 2, mem_usage, "Mem");
 
-        // Simulated system info (replace with actual data)
-        // mvprintw moves cursor to (y, x) position and prints formatted string there
-        mvprintw(0, 0, "Tasks: %d total, %d running", 123, 3);
-        mvprintw(1, 0, "Load average: 0.15, 0.10, 0.05");
+        // Draw swap usage bar
+        draw_memory_bar(CPU_CORES + 8, 2, swap_usage, "Swap");
+
+        // Display detailed memory and swap info
+        mvprintw(CPU_CORES + 10, 2, "Total Memory: %.1f GB", mem_info.total_mem / 1024.0 / 1024.0);
+        mvprintw(CPU_CORES + 11, 2, "Used Memory: %lld MB", mem_info.used_mem / 1024);
+        mvprintw(CPU_CORES + 12, 2, "Free Memory: %lld MB", mem_info.free_mem / 1024);
+        mvprintw(CPU_CORES + 13, 2, "Cached Memory: %lld MB", mem_info.cached_mem / 1024);
+        mvprintw(CPU_CORES + 14, 2, "Total Swap: %lld MB", mem_info.total_swap / 1024);
+        mvprintw(CPU_CORES + 15, 2, "Used Swap: %lld MB", mem_info.used_swap / 1024);
 
         refresh();  // Update the screen
 
@@ -65,10 +85,11 @@ int main() {
 
     //mvwprintw(top_win, 1, 1, "Top Window");
     //mvwprintw(middle_win, 1, 1, "Middle Window");
-    mvwprintw(bottom_win, 1, 1, "Bottom Window");
+    //mvwprintw(bottom_win, 1, 1, "Bottom Window");
 
-    nodelay(stdscr, TRUE);  // Non-blocking input
+    //nodelay(stdscr, TRUE);  // Non-blocking input
 
+    /*
     while(1) {
         int ch = getch();
         if (ch == 'q') break;  // Exit loop on 'q'
@@ -86,7 +107,7 @@ int main() {
     wrefresh(top_win);
     wrefresh(middle_win);
     wrefresh(bottom_win);
-
+    */
 
     /*
     printw("type a character: ");
@@ -104,7 +125,7 @@ int main() {
     } */
 
     //refresh();
-    getch();
+    //getch();
     endwin();
 
     return 0;
@@ -126,7 +147,29 @@ void draw_cpu_bars(int y, int x, float cpu_usages[CPU_CORES]) {
     }
 }
 
+// Function to draw memory or swap usage bars
+void draw_memory_bar(int y, int x, float usage, const char *label) {
+    mvprintw(y, x, "%s: ", label);
+    int usage_bar = (int)(usage * 50);  // Scale usage to fit bar
+    if (strcmp(label, "Mem") == 0) {
+        attron(COLOR_PAIR(2));  // Memory bar in blue
+    } else {
+        attron(COLOR_PAIR(3));  // Swap bar in red
+    }
+    for (int i = 0; i < usage_bar; i++) {
+        printw("|");
+    }
+    if (strcmp(label, "Mem") == 0) {
+        attroff(COLOR_PAIR(2));
+    } else {
+        attroff(COLOR_PAIR(3));
+    }
+    printw(" %.1f%%", usage * 100);
+}
+
+
 // Function to draw memory usage
+/*
 void draw_memory_bar(int y, int x, float mem_usage) {
     mvprintw(y, x, "Memory: ");
     int mem_bar = (int)(mem_usage * 50);
@@ -137,3 +180,4 @@ void draw_memory_bar(int y, int x, float mem_usage) {
     attroff(COLOR_PAIR(2));
     printw(" %.1f%% of %dMB", mem_usage * 100, MEM_TOTAL);
 }
+*/
