@@ -55,7 +55,7 @@ void get_process_user(int pid, char *user) {
 }
 // Function to calculate CPU usage of the process
 float get_cpu_usage(int pid) {
-    char path[64], buffer[256];
+    char path[64];
     snprintf(path, 64, "/proc/%d/stat", pid);
     FILE *fp = fopen(path, "r");
     if (fp == NULL) return 0.0;
