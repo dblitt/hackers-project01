@@ -50,25 +50,6 @@ long get_memory_usage(int pid) {
     return 0;
 }
 
-// Function to display process info with scrolling
-void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start) {
-    int row = 1;
-
-    wattron(win, A_BOLD | COLOR_PAIR(1));  // Bold and colored header
-    mvwprintw(win, 0, 1, "PID      NAME             CPU(%%)   MEMORY(KB)");
-    wattroff(win, A_BOLD | COLOR_PAIR(1));
-
-    for (int i = start; i < num_processes && row < DISPLAY_ROWS; i++) {
-        if (processes[i].cpu_usage > 50.0) {  // Highlight high CPU usage in red
-            wattron(win, COLOR_PAIR(2));
-        }
-        mvwprintw(win, row, 1, "%-8d %-16s %-8.2f %-12ld", processes[i].pid, processes[i].name, processes[i].cpu_usage, processes[i].memory);
-        wattroff(win, COLOR_PAIR(2));
-        row++;
-    }
-    wrefresh(win);
-}
-
 // Function to read process information
 int read_process_info(ProcessInfo *processes) {
     DIR *dir = opendir("/proc");
@@ -102,62 +83,4 @@ int read_process_info(ProcessInfo *processes) {
 
     closedir(dir);
     return num_processes;
-}
-
-// Initialize color pairs for ncurses
-void init_colors() {
-    start_color();
-    init_pair(1, COLOR_CYAN, COLOR_BLACK);  // Cyan text for headers
-    init_pair(2, COLOR_RED, COLOR_BLACK);   // Red text for high CPU usage
-    init_pair(3, COLOR_GREEN, COLOR_BLACK); // Green text for normal processes
-}
-
-int main() {
-    // Initialize ncurses
-    initscr();
-    noecho();
-    cbreak();
-    curs_set(FALSE);
-    keypad(stdscr, TRUE);  // Enable keyboard input
-    timeout(1000);  // Set a timeout for getch
-
-    // Initialize color support
-    if (has_colors()) {
-        init_colors();
-    }
-
-    WINDOW *proc_win = newwin(DISPLAY_ROWS, 80, 0, 0);
-
-    ProcessInfo processes[MAX_PROCESSES];
-    int start = 0;  // Variable for scrolling through the list
-    int num_processes = 0;  // Total number of processes
-
-    while (1) {
-        // Read process info
-        num_processes = read_process_info(processes);
-
-        // Sort processes by CPU usage (optional)
-        for (int i = 0; i < num_processes - 1; i++) {
-            for (int j = 0; j < num_processes - i - 1; j++) {
-                if (processes[j].cpu_usage < processes[j + 1].cpu_usage) {
-                    ProcessInfo temp = processes[j];
-                    processes[j] = processes[j + 1];
-                    processes[j + 1] = temp;
-                }
-            }
-        }
-
-        // Display process information in the window
-        display_process_info(proc_win, processes, num_processes, start);
-
-        // Scroll through processes with arrow keys or 'j' and 'k'
-        int ch = getch();
-        if (ch == 'q') break;  // Press 'q' to quit
-        else if ((ch == KEY_DOWN || ch == 'j') && start + DISPLAY_ROWS < num_processes) start++;  // Scroll down
-        else if ((ch == KEY_UP || ch == 'k') && start > 0) start--;  // Scroll up
-    }
-
-    // End ncurses mode
-    endwin();
-    return 0;
 }
