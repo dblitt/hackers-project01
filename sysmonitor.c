@@ -98,10 +98,19 @@ int main() {
 
         wclear(left_win);  // Clear the screen before updating
 
+        // Aditional system information
+        float load1, load5, load15;
+        get_load_average(&load1, &load5, &load15);
+        double uptime;
+        get_uptime(&uptime);
+        int tasks = get_task_count();
+        
+        wclear(left_win);
+
         // Display task summary and load averages (mocked for now)
-        mvwprintw(left_win,0, 0, "Tasks: %d total, %d running", 145, 3);  // Replace with actual task data if available
-        mvwprintw(left_win,1, 0, "Load average: 0.25, 0.20, 0.10");       // Replace with actual load averages
-        mvwprintw(left_win,2, 0, "Uptime: 12:34:56");                     // Replace with actual system uptime if available
+        mvwprintw(left_win,0, 0, "Tasks: %d total", tasks);  // Replace with actual task data if available
+        mvwprintw(left_win,1, 0, "Load average: %.2f, %.2f, %.2f", load1, load5, load15);       // Replace with actual load averages
+        mvwprintw(left_win,2, 0, "Uptime: %.0f seconds", uptime);                     // Replace with actual system uptime if available
 
         // Draw CPU usage bars
         draw_cpu_bars(left_win, 4, 2, info->loads, info->num_cores);

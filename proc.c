@@ -84,3 +84,47 @@ int read_process_info(ProcessInfo *processes) {
     closedir(dir);
     return num_processes;
 }
+
+// Function to calculate the number of tasks (processes)
+int get_task_count() {
+    DIR *dir = opendir("/proc");
+    if (dir == NULL) {
+        perror("opendir() error");
+        return -1;
+    }
+
+    struct dirent *entry;
+    int count = 0;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (isdigit(entry->d_name[0])) {
+            count++;
+        }
+    }
+    closedir(dir);
+    return count;
+}
+
+// Function to get load averages
+void get_load_average(float *load1, float *load5, float *load15) {
+    FILE *fp = fopen("/proc/loadavg", "r");
+    if (fp == NULL) {
+        perror("fopen() error");
+        return;
+    }
+
+    fscanf(fp, "%f %f %f", load1, load5, load15);
+    fclose(fp);
+}
+
+// Function to get system uptime
+void get_uptime(double *uptime) {
+    FILE *fp = fopen("/proc/uptime", "r");
+    if (fp == NULL) {
+        perror("fopen() error");
+        return;
+    }
+
+    fscanf(fp, "%lf", uptime);
+    fclose(fp);
+}
