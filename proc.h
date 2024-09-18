@@ -3,10 +3,12 @@
 typedef struct {
     int pid;
     char name[256];
+    char user[64];
     float cpu_usage;
     long memory;
 } ProcessInfo;
 
+void get_process_user(int pid, char *user);
 float get_cpu_usage(int pid);
 long get_memory_usage(int pid);
 int read_process_info(ProcessInfo *processes);

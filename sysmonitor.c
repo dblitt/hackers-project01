@@ -134,8 +134,10 @@ int main() {
 
         free_cpu_load_info(info);
 
-        sleep(1);  // Update every second
+        sleep(0.1);  // Update every second
     }
+    delwin(left_win);
+    delwin(right_win);
     endwin();
 
     return 0;
@@ -181,16 +183,14 @@ void draw_memory_bar(WINDOW *win, int y, int x, float usage, const char *label) 
 void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start) {
     int row = 1;
 
-    wattron(win, COLOR_PAIR(1));  // Bold and colored header
-    mvwprintw(win, 0, 1, "PID      NAME             CPU(%%)   MEMORY(KB)");
-    wattroff(win, COLOR_PAIR(1));
+       mvwprintw(win, 0, 1, "PID      USER        NAME             CPU(%%)   MEMORY(KB)");
 
     for (int i = start; i < num_processes && row < DISPLAY_ROWS; i++) {
         if (processes[i].cpu_usage > 50.0) {  // Highlight high CPU usage in red
-            wattron(win, COLOR_PAIR(2));
+            wattron(win, COLOR_PAIR(3));
         }
-        mvwprintw(win, row, 1, "%-8d %-16s %-8.2f %-12ld", processes[i].pid, processes[i].name, processes[i].cpu_usage, processes[i].memory);
-        wattroff(win, COLOR_PAIR(2));
+        mvwprintw(win, row, 1, "%-8d %-10s %-16s %-8.2f %-12ld", processes[i].pid, processes[i].user, processes[i].name, processes[i].cpu_usage, processes[i].memory);
+        wattroff(win, COLOR_PAIR(3));
         row++;
     }
     wrefresh(win);
