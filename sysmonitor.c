@@ -19,6 +19,8 @@ int main() {
     keypad(stdscr, true);
     noecho();
     nodelay(stdscr, TRUE);
+    mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);  // Enable mouse events
+
     int term_height, term_width;
     getmaxyx(stdscr, term_height, term_width);
     int left_window_width = term_width / 2;
@@ -46,6 +48,22 @@ int main() {
     while (1) {
         ch = getch();
         if (ch == 'q') break;  // Exit loop on 'q'
+
+        // Handle mouse input
+        MEVENT event;
+        if (ch == KEY_MOUSE) {
+            if (getmouse(&event) == OK) {
+                if (event.bstate & BUTTON4_PRESSED) {  // Scroll up
+                    if (start > 0) {
+                        start--;
+                    }
+                } else if (event.bstate & BUTTON5_PRESSED) {  // Scroll down
+                    if (start < num_processes - DISPLAY_ROWS) {
+                        start++;
+                    }
+                }
+            }
+        }
 
         // Get CPU load information
         cpu_load_info_t *info = get_cpu_load_info();
