@@ -6,12 +6,12 @@
 
 #define CPU_CORES 32
 #define MEM_TOTAL 8000
-#define DISPLAY_ROWS 100  // Number of rows for displaying processes
+#define DISPLAY_ROWS 48  // Number of rows for displaying processes
 #define MAX_PROCESSES 1024
 
 void draw_memory_bar(WINDOW *win, int y, int x, float mem_usage, const char *label);
 void draw_cpu_bars(WINDOW *win, int y, int x, float *cpu_usages, int num_cores);
-void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start);
+void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start, int selected);
 
 int main() {
     initscr();
@@ -38,6 +38,7 @@ int main() {
 
     ProcessInfo processes[MAX_PROCESSES];
     int start = 0;  // Variable for scrolling through the list
+    int selected = 0;
     int num_processes = 0;  // Total number of processes
 
 
@@ -50,21 +51,37 @@ int main() {
         if (ch == 'q') break;  // Exit loop on 'q'
 
         // Handle mouse input
-        MEVENT event;
-        if (ch == KEY_MOUSE) {
-            if (getmouse(&event) == OK) {
-                if (event.bstate & BUTTON4_PRESSED) {  // Scroll up
-                    if (start > 0) {
-                        start--;
-                    }
-                } else if (event.bstate & BUTTON5_PRESSED) {  // Scroll down
-                    if (start < num_processes - DISPLAY_ROWS) {
-                        start++;
-                    }
-                }
+        // MEVENT event;
+        // if (ch == KEY_MOUSE) {
+        //     if (getmouse(&event) == OK) {
+        //         if (event.bstate & BUTTON4_PRESSED) {  // Scroll up
+        //             if (start > 0) {
+        //                 start--;
+        //             }
+        //         } else if (event.bstate & BUTTON5_PRESSED) {  // Scroll down
+        //             if (start < num_processes - DISPLAY_ROWS) {
+        //                 start++;
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Move selection up or down
+        if ((ch == KEY_DOWN || ch == 'j') && selected < num_processes - 1) {
+            selected++;
+            // Only scroll down when the selected process reaches the last visible row
+            if (selected - start >= DISPLAY_ROWS - 1) {
+                start++;
+            }
+        } else if ((ch == KEY_UP || ch == 'k') && selected > 0) {
+            selected--;
+            // Scroll up only if the selected process goes above the visible window
+            if (selected < start) {
+                start--;
             }
         }
-
+        
+        display_process_info(right_win, processes, num_processes, start, selected);
         // Get CPU load information
         cpu_load_info_t *info = get_cpu_load_info();
 
@@ -79,9 +96,6 @@ int main() {
                 }
             }
         }
-
-        display_process_info(right_win, processes, num_processes, start);
-
         if (info == NULL) {
             mvprintw(0, 0, "Failed to retrieve CPU load information.");
             wrefresh(left_win);
@@ -180,17 +194,21 @@ void draw_memory_bar(WINDOW *win, int y, int x, float usage, const char *label) 
     wrefresh(win);
 }
 
-void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start) {
+void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start, int selected) {
     int row = 1;
 
        mvwprintw(win, 0, 1, "PID      USER        NAME             CPU(%%)   MEMORY(KB)");
 
     for (int i = start; i < num_processes && row < DISPLAY_ROWS; i++) {
         if (processes[i].cpu_usage > 50.0) {  // Highlight high CPU usage in red
+            if (i == selected) {
+                wattron(win, A_REVERSE);  // Reverse video for highlighting
+        }
             wattron(win, COLOR_PAIR(3));
         }
-        mvwprintw(win, row, 1, "%-8d %-10s %-16s %-8.2f %-12ld", processes[i].pid, processes[i].user, processes[i].name, processes[i].cpu_usage, processes[i].memory);
+        mvwprintw(win, row, 1, "%-8d %-10s %-16s %-8.2f %-12ld", processes[i].pid, processes[i].name, processes[i].name, processes[i].cpu_usage, processes[i].memory);
         wattroff(win, COLOR_PAIR(3));
+        wattroff(win, A_REVERSE);
         row++;
     }
     wrefresh(win);
