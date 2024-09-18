@@ -4,8 +4,6 @@
 #include "cpuusage.h"
 #include "proc.h"
 
-#define CPU_CORES 32
-#define MEM_TOTAL 8000
 #define DISPLAY_ROWS 48  // Number of rows for displaying processes
 #define MAX_PROCESSES 1024
 
@@ -31,8 +29,6 @@ int main() {
     init_pair(2, COLOR_BLUE, COLOR_BLACK);  // Color for memory bars
     init_pair(3, COLOR_RED, COLOR_BLACK); // Color for swap bars
 
-    // Simulated data (replace this with actual system data)
-    float cpu_usages[CPU_CORES];
     float mem_usage, swap_usage;
 
 
@@ -47,39 +43,43 @@ int main() {
     WINDOW *right_win = newwin(DISPLAY_ROWS, right_window_width, 0, left_window_width);
 
     while (1) {
-        ch = getch();
-        if (ch == 'q') break;  // Exit loop on 'q'
+        bool quit = false;
 
-        // Handle mouse input
-        // MEVENT event;
-        // if (ch == KEY_MOUSE) {
-        //     if (getmouse(&event) == OK) {
-        //         if (event.bstate & BUTTON4_PRESSED) {  // Scroll up
-        //             if (start > 0) {
-        //                 start--;
-        //             }
-        //         } else if (event.bstate & BUTTON5_PRESSED) {  // Scroll down
-        //             if (start < num_processes - DISPLAY_ROWS) {
-        //                 start++;
-        //             }
-        //         }
-        //     }
-        // }
+        while ((ch = getch()) != ERR) {
+            if (ch == 'q') quit = true;  // Exit loop on 'q'
 
-        // Move selection up or down
-        if ((ch == KEY_DOWN || ch == 'j') && selected < num_processes - 1) {
-            selected++;
-            // Only scroll down when the selected process reaches the last visible row
-            if (selected - start >= DISPLAY_ROWS - 1) {
-                start++;
-            }
-        } else if ((ch == KEY_UP || ch == 'k') && selected > 0) {
-            selected--;
-            // Scroll up only if the selected process goes above the visible window
-            if (selected < start) {
-                start--;
+            // Handle mouse input
+            // MEVENT event;
+            // if (ch == KEY_MOUSE) {
+            //     if (getmouse(&event) == OK) {
+            //         if (event.bstate & BUTTON4_PRESSED) {  // Scroll up
+            //             if (start > 0) {
+            //                 start--;
+            //             }
+            //         } else if (event.bstate & BUTTON5_PRESSED) {  // Scroll down
+            //             if (start < num_processes - DISPLAY_ROWS) {
+            //                 start++;
+            //             }
+            //         }
+            //     }
+            // }
+
+            // Move selection up or down
+            if ((ch == KEY_DOWN || ch == 'j') && selected < num_processes - 1) {
+                selected++;
+                // Only scroll down when the selected process reaches the last visible row
+                if (selected - start >= DISPLAY_ROWS - 1) {
+                    start++;
+                }
+            } else if ((ch == KEY_UP || ch == 'k') && selected > 0) {
+                selected--;
+                // Scroll up only if the selected process goes above the visible window
+                if (selected < start) {
+                    start--;
+                }
             }
         }
+        if (quit) break;
         
         display_process_info(right_win, processes, num_processes, start, selected);
         // Get CPU load information
@@ -103,7 +103,10 @@ int main() {
             sleep(1);
             continue;
         }
-        
+
+        // uncomment to arifically limit the number of CPUs shown
+        // info->num_cores = 8;
+
         // Get memory information
         MemInfo mem_info;
         get_mem_info(&mem_info);
@@ -130,25 +133,25 @@ int main() {
         draw_cpu_bars(left_win, 4, 2, info->loads, info->num_cores);
 
         // Draw memory usage bar
-        draw_memory_bar(left_win, CPU_CORES + 6, 2, mem_usage, "Mem");
+        draw_memory_bar(left_win, info->num_cores + 6, 2, mem_usage, "Mem");
 
         // Draw swap usage bar
-        draw_memory_bar(left_win, CPU_CORES + 8, 2, swap_usage, "Swap");
+        draw_memory_bar(left_win, info->num_cores + 8, 2, swap_usage, "Swap");
 
         // Display detailed memory and swap info
-        mvwprintw(left_win, CPU_CORES + 10, 2, "Total Memory: %.1f GB", mem_info.total_mem / 1024.0 / 1024.0);
-        mvwprintw(left_win, CPU_CORES + 11, 2, "Used Memory: %lld MB", mem_info.used_mem / 1024);
-        mvwprintw(left_win, CPU_CORES + 12, 2, "Free Memory: %lld MB", mem_info.free_mem / 1024);
-        mvwprintw(left_win, CPU_CORES + 13, 2, "Cached Memory: %lld MB", mem_info.cached_mem / 1024);
-        mvwprintw(left_win, CPU_CORES + 14, 2, "Total Swap: %lld MB", mem_info.total_swap / 1024);
-        mvwprintw(left_win, CPU_CORES + 15, 2, "Used Swap: %lld MB", mem_info.used_swap / 1024);
+        mvwprintw(left_win, info->num_cores + 10, 2, "Total Memory: %.1f GB", mem_info.total_mem / 1024.0 / 1024.0);
+        mvwprintw(left_win, info->num_cores + 11, 2, "Used Memory: %lld MB", mem_info.used_mem / 1024);
+        mvwprintw(left_win, info->num_cores + 12, 2, "Free Memory: %lld MB", mem_info.free_mem / 1024);
+        mvwprintw(left_win, info->num_cores + 13, 2, "Cached Memory: %lld MB", mem_info.cached_mem / 1024);
+        mvwprintw(left_win, info->num_cores + 14, 2, "Total Swap: %lld MB", mem_info.total_swap / 1024);
+        mvwprintw(left_win, info->num_cores + 15, 2, "Used Swap: %lld MB", mem_info.used_swap / 1024);
 
         wrefresh(left_win);  // Update the screen
         wrefresh(right_win); // Update the screen
 
         free_cpu_load_info(info);
 
-        sleep(0.1);  // Update every second
+        // sleep(1);  // Update every second
     }
     delwin(left_win);
     delwin(right_win);
