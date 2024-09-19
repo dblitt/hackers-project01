@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <pwd.h>
+#include "hashtable.h"
+#include "cpuusage.h"
 
 #define MAX_PROCESSES 1024
 #define DISPLAY_ROWS 20  // Number of rows for displaying processes
@@ -54,17 +56,21 @@ void get_process_user(int pid, char *user) {
     }
 }
 // Function to calculate CPU usage of the process
-float get_cpu_usage(int pid) {
-    char path[64];
-    snprintf(path, 64, "/proc/%d/stat", pid);
-    FILE *fp = fopen(path, "r");
-    if (fp == NULL) return 0.0;
-
-    long utime, stime;
-    fscanf(fp, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %ld %ld", &utime, &stime);
-    fclose(fp);
-
-    return (float)(utime + stime) / sysconf(_SC_CLK_TCK);
+float get_cpu_usage(int pid, HashTable *table, uint64_t total_cpu_time_diff) {
+    uint64_t new_proc_cpu_time;
+    if (read_process_cpu_time(pid, &new_proc_cpu_time) == -1) {
+        return 0.0;
+    }
+    uint64_t old_proc_cpu_time = hashtable_search(table, pid);
+    hashtable_insert(table, pid, new_proc_cpu_time);
+    if (old_proc_cpu_time == 0) {
+        return 0.0;
+    }
+    if (total_cpu_time_diff == 0) {
+        return 0.0;
+    }
+    float usage = 100 * (float)(new_proc_cpu_time - old_proc_cpu_time) / total_cpu_time_diff;
+    return usage;
 }
 
 // Function to calculate memory usage of the process
@@ -72,7 +78,9 @@ long get_memory_usage(int pid) {
     char path[64], buffer[256];
     snprintf(path, 64, "/proc/%d/status", pid);
     FILE *fp = fopen(path, "r");
-    if (fp == NULL) return 0;
+    if (fp == NULL) {
+        return 0;
+    }
 
     while (fgets(buffer, sizeof(buffer), fp)) {
         if (strncmp(buffer, "VmRSS:", 6) == 0) {
@@ -88,7 +96,7 @@ long get_memory_usage(int pid) {
 }
 
 // Function to read process information
-int read_process_info(ProcessInfo *processes) {
+int read_process_info(ProcessInfo *processes, HashTable *table, uint64_t total_cpu_time_diff, int num_cores) {
     DIR *dir = opendir("/proc");
     if (dir == NULL) {
         perror("opendir() error");
@@ -101,6 +109,7 @@ int read_process_info(ProcessInfo *processes) {
     while ((entry = readdir(dir)) != NULL) {
         if (isdigit(entry->d_name[0])) {
             int pid = atoi(entry->d_name);
+            if (pid != 1 && pid < 1000) continue;
             snprintf(processes[num_processes].name, sizeof(processes[num_processes].name), "/proc/%d/stat", pid);
 
             // Open the stat file to get the process name
@@ -110,7 +119,7 @@ int read_process_info(ProcessInfo *processes) {
             fscanf(fp, "%d %s", &processes[num_processes].pid, processes[num_processes].name);
             fclose(fp);
 
-            processes[num_processes].cpu_usage = get_cpu_usage(pid);
+            processes[num_processes].cpu_usage = get_cpu_usage(pid, table, total_cpu_time_diff) * num_cores;
             processes[num_processes].memory = get_memory_usage(pid);
 
             get_process_user(pid, processes[num_processes].user);

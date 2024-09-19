@@ -3,7 +3,9 @@
 #ifndef CPUUSAGE_H
 #define CPUUSAGE_H
 
+#include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 /**
  * @brief Reads CPU statistics from /proc/stat and calculates the CPU
@@ -63,5 +65,27 @@ void free_cpu_load_info(cpu_load_info_t *info);
  * @return cpu_load_info_t* A pointer to the cpu_load_info_t structure, or NULL on error.
  */
 cpu_load_info_t* get_cpu_load_info();
+
+typedef struct {
+    uint64_t utime; /**< User mode CPU time */
+    uint64_t stime; /**< Kernel mode CPU time */
+} process_cpu_time_t;
+
+/**
+ * @brief Reads CPU times for a given process from /proc/[pid]/stat.
+ * 
+ * @param pid The process ID.
+ * @param time Pointer to store the time.
+ * @return int 0 on success, -1 on failure.
+ */
+int read_process_cpu_time(pid_t pid, uint64_t *time);
+
+/**
+ * @brief Reads total CPU times from /proc/stat for all CPUs.
+ * 
+ * @param total_cpu_time Pointer to store the total CPU time.
+ * @return int 0 on success, -1 on failure.
+ */
+int read_total_cpu_time(uint64_t *total_cpu_time);
 
 #endif

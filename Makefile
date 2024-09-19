@@ -7,7 +7,7 @@ TARGETS = sysmonitor cpuusage_main
 
 all: $(TARGETS)
 
-sysmonitor: sysmonitor.o cpuusage.o proc.o
+sysmonitor: sysmonitor.o cpuusage.o proc.o hashtable.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 cpuusage_main: cpuusage_main.o cpuusage.o

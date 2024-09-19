@@ -4,6 +4,7 @@
 #include <signal.h>
 #include "cpuusage.h"
 #include "proc.h"
+#include "hashtable.h"
 
 // #define term_height 20  // Number of rows for displaying processes
 #define MAX_PROCESSES 1024
@@ -45,7 +46,9 @@ int main() {
     int selected = 0;
     int num_processes = 0;  // Total number of processes
 
-
+    HashTable *process_time_table = hashtable_create();
+    uint64_t last_total_cpu_time;
+    read_total_cpu_time(&last_total_cpu_time);
 
     WINDOW *left_win = newwin(term_height, left_window_width, 0, 0);          // Left window for process info
     WINDOW *right_win = newwin(term_height, right_window_width, 0, left_window_width);
@@ -92,9 +95,18 @@ int main() {
         display_process_info(right_win, processes, num_processes, start, selected, term_height);
         // Get CPU load information
         cpu_load_info_t *info = get_cpu_load_info();
+        if (info == NULL) {
+            mvprintw(0, 0, "Failed to retrieve CPU load information.");
+            wrefresh(left_win);
+            wrefresh(right_win);
+            sleep(1);
+            continue;
+        }
 
-
-        num_processes = read_process_info(processes);
+        uint64_t new_total_cpu_time;
+        read_total_cpu_time(&new_total_cpu_time);
+        num_processes = read_process_info(processes, process_time_table, new_total_cpu_time - last_total_cpu_time, info->num_cores);
+        last_total_cpu_time = new_total_cpu_time;
         for (int i = 0; i < num_processes - 1; i++) {
             for (int j = 0; j < num_processes - i - 1; j++) {
                 if (processes[j].cpu_usage < processes[j + 1].cpu_usage) {
@@ -104,16 +116,9 @@ int main() {
                 }
             }
         }
-        if (info == NULL) {
-            mvprintw(0, 0, "Failed to retrieve CPU load information.");
-            wrefresh(left_win);
-            wrefresh(right_win);
-            sleep(1);
-            continue;
-        }
 
-        // uncomment to arifically limit the number of CPUs shown
-        info->num_cores = 8;
+        // uncomment to artificially limit the number of CPUs shown
+        // info->num_cores = 8;
 
         // Get memory information
         MemInfo mem_info;
@@ -123,7 +128,7 @@ int main() {
 
         wclear(left_win);  // Clear the screen before updating
 
-        // Aditional system information
+        // Additional system information
         float load1, load5, load15;
         get_load_average(&load1, &load5, &load15);
         double uptime;
@@ -159,7 +164,7 @@ int main() {
 
         free_cpu_load_info(info);
 
-        // sleep(1);  // Update every second
+        sleep(1);  // Update every second
     }
     delwin(left_win);
     delwin(right_win);
@@ -172,7 +177,7 @@ int main() {
 // Function to draw CPU usage bars
 void draw_cpu_bars(WINDOW *win, int y, int x, float *cpu_usages, int num_cores) {
     for (int i = 0; i < num_cores; i++) {
-        mvwprintw(win, y + i, x, "CPU %2d: |", i);
+        mvwprintw(win, y + i, x, "CPU %2d: [", i);
         int usage_bar = (int)(cpu_usages[i] * 50); // Scale usage to fit bar
         wattron(win, COLOR_PAIR(1));
         for (int j = 0; j < usage_bar; j++) {
@@ -182,7 +187,7 @@ void draw_cpu_bars(WINDOW *win, int y, int x, float *cpu_usages, int num_cores) 
         for (int j = 0; j < 50 - usage_bar; j++) {
             wprintw(win, " ");
         }
-        wprintw(win, "|");
+        wprintw(win, "]");
         wprintw(win, " %.1f%%", cpu_usages[i] * 100);
     }
     wrefresh(win);
@@ -190,7 +195,7 @@ void draw_cpu_bars(WINDOW *win, int y, int x, float *cpu_usages, int num_cores) 
 
 // Function to draw memory or swap usage bars
 void draw_memory_bar(WINDOW *win, int y, int x, float usage, const char *label) {
-    mvwprintw(win, y, x, "%6s: |", label);
+    mvwprintw(win, y, x, "%6s: [", label);
     int usage_bar = (int)(usage * 50);  // Scale usage to fit bar
     if (strcmp(label, "Mem") == 0) {
         wattron(win, COLOR_PAIR(2));  // Memory bar in blue
@@ -208,7 +213,7 @@ void draw_memory_bar(WINDOW *win, int y, int x, float usage, const char *label) 
     for (int i = 0; i < 50 - usage_bar; i++) {
         wprintw(win, " ");
     }
-    wprintw(win, "|");
+    wprintw(win, "]");
     wprintw(win, " %.1f%%", usage * 100);
     wrefresh(win);
 }
@@ -216,16 +221,16 @@ void draw_memory_bar(WINDOW *win, int y, int x, float usage, const char *label) 
 void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start, int selected, int term_height) {
     int row = 1;
 
-       mvwprintw(win, 0, 1, "PID      USER        NAME             CPU(%%)   MEMORY(KB)");
+    mvwprintw(win, 0, 1, "PID      USER       NAME             CPU(%%)   MEMORY(KB)");
 
     for (int i = start; i < num_processes && row < term_height; i++) {
         if (processes[i].cpu_usage > 50.0) {  // Highlight high CPU usage in red
-            if (i == selected) {
-                wattron(win, A_REVERSE);  // Reverse video for highlighting
-        }
             wattron(win, COLOR_PAIR(3));
         }
-        mvwprintw(win, row, 1, "%-8d %-10s %-16s %-8.2f %-12ld", processes[i].pid, processes[i].name, processes[i].name, processes[i].cpu_usage, processes[i].memory);
+        if (i == selected) {
+            wattron(win, A_REVERSE);  // Reverse video for highlighting
+        }
+        mvwprintw(win, row, 1, "%-8d %-10.10s %-16.16s %-8.2f %-12ld", processes[i].pid, processes[i].user, processes[i].name, processes[i].cpu_usage, processes[i].memory);
         wattroff(win, COLOR_PAIR(3));
         wattroff(win, A_REVERSE);
         row++;

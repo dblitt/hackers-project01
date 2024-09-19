@@ -381,3 +381,124 @@ int get_mem_info(MemInfo *mem_info) {
 
     return 0;
 }
+
+// /**
+//  * @brief Reads CPU times for a given process from /proc/[pid]/stat.
+//  * 
+//  * @param pid The process ID.
+//  * @param time Pointer to store the time.
+//  * @return int 0 on success, -1 on failure.
+//  */
+// int read_process_cpu_time(pid_t pid, uint64_t *time) {
+//     char filepath[256];
+//     snprintf(filepath, sizeof(filepath), "/proc/%d/stat", pid);
+
+//     FILE *file = fopen(filepath, "r");
+//     if (!file) {
+//         perror("Failed to open /proc/[pid]/stat");
+//         return -1;
+//     }
+
+//     // Reading fields from /proc/[pid]/stat; we are interested in fields 14 (utime) and 15 (stime)
+//     unsigned long utime, stime;
+//     int val = fscanf(file, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu", &utime, &stime);
+//     if (val != 2) {
+//         perror("Failed to read process CPU times");
+//         fclose(file);
+//         return -1;
+//     }
+
+//     fclose(file);
+
+//     // Store the CPU times in the structure
+//     *time = (uint64_t)utime;
+//     *time += (uint64_t)stime;
+
+//     return 0;
+// }
+
+/**
+ * @brief Reads CPU time for a given process from /proc/[pid]/stat.
+ * 
+ * @param pid The process ID.
+ * @param time Pointer to store the time.
+ * @return int 0 on success, -1 on failure.
+ */
+int read_process_cpu_time(pid_t pid, uint64_t *time) {
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "/proc/%d/stat", pid);
+
+    FILE *file = fopen(filepath, "r");
+    if (!file) {
+        perror("Failed to open /proc/[pid]/stat");
+        return -1;
+    }
+
+    // Read the whole line from the file
+    char line[1024];
+    if (!fgets(line, sizeof(line), file)) {
+        perror("Failed to read process stats");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+
+    // Parse the line to extract utime and stime
+    char *pointer = line;
+    char *lastparen = line;
+    while (*pointer) {
+        if (*pointer == ')') {
+            lastparen = pointer;
+        }
+        pointer++;
+    }
+    lastparen += 2;
+    unsigned long utime, stime;
+    int fields_read = sscanf(lastparen,
+                             "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu",
+                             &utime, &stime);
+
+    if (fields_read != 2) {
+        perror("Failed to parse process CPU times");
+        return -1;
+    }
+
+    // Store the CPU times in the structure
+    *time = (uint64_t)utime + (uint64_t)stime;
+
+    return 0;
+}
+
+/**
+ * @brief Reads total CPU times from /proc/stat for all CPUs.
+ * 
+ * @param total_cpu_time Pointer to store the total CPU time.
+ * @return int 0 on success, -1 on failure.
+ */
+int read_total_cpu_time(uint64_t *total_cpu_time) {
+    FILE *file = fopen("/proc/stat", "r");
+    if (!file) {
+        perror("Failed to open /proc/stat");
+        return -1;
+    }
+
+    char buffer[256];
+    uint64_t user, nice, system, idle, iowait, irq, softirq, steal;
+
+    // Read the first line, which gives the total CPU time across all cores
+    if (fgets(buffer, sizeof(buffer), file) == NULL ||
+        sscanf(buffer, "cpu %lu %lu %lu %lu %lu %lu %lu %lu", 
+               &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal) != 8) {
+        perror("Failed to read system CPU times");
+        fclose(file);
+        return -1;
+    }
+
+    fclose(file);
+
+    // Total CPU time is the sum of all fields
+    *total_cpu_time = user + nice + system + idle + iowait + irq + softirq + steal;
+
+    return 0;
+}
