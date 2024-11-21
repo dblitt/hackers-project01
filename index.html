@@ -3,42 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My GitHub Pages Site</title>
+    <title>htop Clone</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
+            font-family: "Courier New", Courier, monospace;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
-            color: #333;
+            background-color: #000;
+            color: #00ff00;
         }
         header {
-            background: #0073e6;
-            color: white;
+            background: #003366; /* Dark Blue */
+            color: #ffff00; /* Yellow */
+            text-align: center;
             padding: 20px 0;
+            border-bottom: 2px solid #00ff00;
         }
         main {
             padding: 20px;
+            max-width: 800px;
+            margin: auto;
+            background: #001a00; /* Dark Green */
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+        section {
+            margin-bottom: 20px;
+        }
+        .features ul {
+            list-style-type: square;
+            margin: 0;
+            padding: 0;
+        }
+        .features ul li {
+            margin-bottom: 10px;
+        }
+        a {
+            color: #00ccff; /* Light Blue */
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
         }
         footer {
-            background: #222;
-            color: #fff;
+            background: #003366; /* Dark Blue */
+            color: #ffff00; /* Yellow */
+            text-align: center;
             padding: 10px 0;
-            margin-top: 20px;
+            border-top: 2px solid #00ff00;
+        }
+        .demo-video {
+            display: block;
+            max-width: 100%;
+            margin: 20px 0;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #00ccff; /* Light Blue */
+            border-bottom: 1px solid #00ff00;
+            padding-bottom: 5px;
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>Welcome to My GitHub Pages Site!</h1>
+        <h1>htop Clone</h1>
+        <p>Monitor your system processes and CPU usage with ease!</p>
     </header>
     <main>
-        <p>This is a simple static website hosted on GitHub Pages.</p>
-        <p>Edit this file to add your own content.</p>
+        <section class="features">
+            <h2>Features</h2>
+            <ul>
+                <li>Displays a real-time list of running processes</li>
+                <li>Live CPU usage monitoring</li>
+                <li>Intuitive and responsive interface</li>
+            </ul>
+        </section>
+        <section class="demo">
+            <h2>Demo Video</h2>
+            <video class="demo-video" controls>
+                <source src="demo.mp4" type="video/mp4">
+                Your browser does not support the video tag. Download the demo video <a href="demo.mp4">here</a>.
+            </video>
+        </section>
+        <section class="repository">
+            <h2>Repository</h2>
+            <p>Check out the code and contribute to the project on <a href="https://github.com/dblitt/hackers-project01" target="_blank">GitHub</a>.</p>
+        </section>
     </main>
     <footer>
-        <p>&copy; 2024 My GitHub Pages Site</p>
+        <p>&copy; 2024 htop Clone Project.</p>
     </footer>
 </body>
 </html>
