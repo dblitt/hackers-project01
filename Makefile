@@ -8,10 +8,10 @@ TARGETS = sysmonitor cpuusage_main
 all: $(TARGETS)
 
 sysmonitor: sysmonitor.o cpuusage.o proc.o hashtable.o
-	$(LD) $(LDFLAGS) -o $@ $^
+	$(LD) -o $@ $^ $(LDFLAGS)
 
 cpuusage_main: cpuusage_main.o cpuusage.o
-	$(LD) $(LDFLAGS) -o $@ $^
+	$(LD) -o $@ $^ $(LDFLAGS)
 
 clean:
 	@echo Cleaning...
