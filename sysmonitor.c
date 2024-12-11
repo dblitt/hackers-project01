@@ -1,383 +1,281 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <unistd.h>
-
+#include <ncurses.h>
+#include <unistd.h> 
+#include <stdlib.h>  
+#include <signal.h>
 #include "cpuusage.h"
+#include "proc.h"
+#include "hashtable.h"
 
-float get_cpu_load(int ms_interval) {
-    FILE *file;
-    uint64_t user, nice, system, idle, iowait, irq, softirq, steal;
-    uint64_t user2, nice2, system2, idle2, iowait2, irq2, softirq2, steal2;
-    uint64_t total1, total2, idle_time1, idle_time2;
+// #define term_height 20  // Number of rows for displaying processes
+#define MAX_PROCESSES 1024
+int pid_col_width, user_col_width, name_col_width, cpu_col_width, mem_col_width;
+int total_width;
 
-    // First reading from /proc/stat
-    file = fopen("/proc/stat", "r");
-    if (file == NULL)
-    {
-        perror("Failed to open /proc/stat");
-        return -1.0f; // Return an error indicator if /proc/stat cannot be opened
-    }
-    
-    // Read the first CPU line (aggregated values across all cores)
-    if (fscanf(file, "cpu  %lu %lu %lu %lu %lu %lu %lu %lu",
-               &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal) != 8)
-    {
-        perror("Failed to read CPU data");
-        fclose(file);
-        return -1.0f; // Return an error if we cannot correctly read the values
-    }
-    fclose(file);
+void draw_memory_bar(WINDOW *win, int y, int x, float mem_usage, const char *label, int bar_width);
+void draw_cpu_bars(WINDOW *win, int y, int x, float *cpu_usages, int num_cores, int bar_width);
+void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start, int selected, int term_height, int term_width);
+void adjust_layout(int term_width);
 
-    // Calculate the total time and idle time from the first read
-    total1 = user + nice + system + idle + iowait + irq + softirq + steal;
-    idle_time1 = idle + iowait;
 
-    // Sleep for a short time to allow for the next CPU measurement (250 ms)
-    usleep(ms_interval * 1000); // 250 milliseconds
-
-    // Second reading from /proc/stat
-    file = fopen("/proc/stat", "r");
-    if (file == NULL)
-    {
-        perror("Failed to open /proc/stat");
-        return -1.0f;
-    }
-
-    // Read the first CPU line again (aggregated values across all cores)
-    if (fscanf(file, "cpu  %lu %lu %lu %lu %lu %lu %lu %lu",
-               &user2, &nice2, &system2, &idle2, &iowait2, &irq2, &softirq2, &steal2) != 8)
-    {
-        perror("Failed to read CPU data");
-        fclose(file);
-        return -1.0f;
-    }
-    fclose(file);
-
-    // Calculate the total time and idle time from the second read
-    total2 = user2 + nice2 + system2 + idle2 + iowait2 + irq2 + softirq2 + steal2;
-    idle_time2 = idle2 + iowait2;
-
-    // Calculate the differences in total time and idle time
-    uint64_t total_diff = total2 - total1;
-    uint64_t idle_diff = idle_time2 - idle_time1;
-
-    // Avoid division by zero (this can happen if total_diff is zero)
-    if (total_diff == 0) {
-        return 0.0f; // CPU load is effectively 0% if no time passed between measurements
-    }
-
-    // Calculate CPU load (1 - the fraction of time spent idle)
-    float cpu_load = (float)(total_diff - idle_diff) / (float)total_diff;
-
-    return cpu_load; // This will return a value between 0.0 (0%) and 1.0 (100%)
+// Signal handler function
+void handle_sigint(int sig) {
+    endwin();  // End ncurses mode
+    exit(0);
 }
 
-void free_cpu_load_info(cpu_load_info_t *info) {
-    if (info) {
-        if (info->loads) {
-            free(info->loads);
+int main() {
+    initscr();
+    cbreak();
+    keypad(stdscr, true);
+    noecho();
+    nodelay(stdscr, TRUE);
+    mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, NULL);  // Enable mouse events
+    signal(SIGINT, handle_sigint);
+
+    int term_height, term_width;
+    getmaxyx(stdscr, term_height, term_width);
+    int left_window_width = term_width / 2;
+    int right_window_width = term_width - left_window_width;
+    int ch;
+    start_color();          // Enable color
+    init_pair(1, COLOR_GREEN, COLOR_BLACK); // Color for CPU bars: init_pair(pair_number, foreground_color, background_color)
+    init_pair(2, COLOR_BLUE, COLOR_BLACK);  // Color for memory bars
+    init_pair(3, COLOR_RED, COLOR_BLACK); // Color for swap bars
+
+    float mem_usage, swap_usage;
+
+
+    ProcessInfo processes[MAX_PROCESSES];
+    int start = 0;  // Variable for scrolling through the list
+    int selected = 0;
+    int num_processes = 0;  // Total number of processes
+
+    HashTable *process_time_table = hashtable_create();
+    uint64_t last_total_cpu_time;
+    read_total_cpu_time(&last_total_cpu_time);
+
+    WINDOW *left_win = newwin(term_height, left_window_width, 0, 0);          // Left window for process info
+    WINDOW *right_win = newwin(term_height, right_window_width, 0, left_window_width);
+
+    while (1) {
+        bool quit = false;
+
+        while ((ch = getch()) != ERR) {
+            if (ch == 'q') quit = true;  // Exit loop on 'q'
+
+            // Handle mouse input
+            // MEVENT event;
+            // if (ch == KEY_MOUSE) {
+            //     if (getmouse(&event) == OK) {
+            //         if (event.bstate & BUTTON4_PRESSED) {  // Scroll up
+            //             if (start > 0) {
+            //                 start--;
+            //             }
+            //         } else if (event.bstate & BUTTON5_PRESSED) {  // Scroll down
+            //             if (start < num_processes - term_height) {
+            //                 start++;
+            //             }
+            //         }
+            //     }
+            // }
+
+            // Move selection up or down
+            if ((ch == KEY_DOWN || ch == 'j') && selected < num_processes - 1) {
+                selected++;
+                // Only scroll down when the selected process reaches the last visible row
+                if (selected - start >= term_height - 1) {
+                    start++;
+                }
+            } else if ((ch == KEY_UP || ch == 'k') && selected > 0) {
+                selected--;
+                // Scroll up only if the selected process goes above the visible window
+                if (selected < start) {
+                    start--;
+                }
+            }
         }
-        free(info);
-    }
-}
+        if (quit) break;
 
-// cpu_load_info_t* get_cpu_load_info() {
-//     FILE *file;
-//     int num_cores = 0;
-//     char buffer[256];
+        getmaxyx(stdscr, term_height, term_width);
+        int bar_width = term_width/2 - 20; // Leave space for labels and percentages
+        if (bar_width < 10) bar_width = 10; // Set a minimum width for bars
+        left_window_width = term_width / 2;
+        right_window_width = term_width - left_window_width;
 
-//     // Open /proc/stat to read CPU information
-//     file = fopen("/proc/stat", "r");
-//     if (file == NULL) {
-//         perror("Failed to open /proc/stat");
-//         return NULL;
-//     }
+        wresize(left_win, term_height, left_window_width);
+        wresize(right_win, term_height, right_window_width);
+        mvwin(right_win, 0, left_window_width);
 
-//     fscanf(file, "%*[^\n]\n");
-//     // First, count how many CPU cores we have by counting the "cpu" lines
-//     while (fgets(buffer, sizeof(buffer), file)) {
-//         if (strncmp(buffer, "cpu", 3) == 0 && buffer[3] != ' ') {
-//             num_cores++;
-//         } else {
-//             continue;
-//         }
-//     }
-    
-//     // Reset the file pointer to the beginning of the file
-//     rewind(file);
-
-//     // Allocate the cpu_load_info_t structure
-//     cpu_load_info_t *info = (cpu_load_info_t *)malloc(sizeof(cpu_load_info_t));
-//     if (!info) {
-//         perror("Failed to allocate cpu_load_info_t");
-//         fclose(file);
-//         return NULL;
-//     }
-
-//     // Allocate memory for the loads array
-//     info->loads = (float *)malloc(num_cores * sizeof(float));
-//     if (!info->loads) {
-//         perror("Failed to allocate loads array");
-//         free(info);
-//         fclose(file);
-//         return NULL;
-//     }
-
-//     // Set the number of cores in the structure
-//     info->num_cores = num_cores;
-
-//     // Variables to store CPU times
-//     uint64_t user, nice, system, idle, iowait, irq, softirq, steal;
-//     uint64_t user2, nice2, system2, idle2, iowait2, irq2, softirq2, steal2;
-//     uint64_t total1, total2, idle_time1, idle_time2;
-
-//     fscanf(file, "%*[^\n]\n");
-
-//     // Read and calculate CPU loads for each core
-//     for (int i = 0; i < num_cores; i++) {
-//         // First reading from /proc/stat
-//         int temp = fscanf(file, "cpu%*d %lu %lu %lu %lu %lu %lu %lu %lu %*d %*d\n", 
-//                    &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal);
-//         if (temp < 8) {
-//             perror("Failed to read CPU data");
-//             free_cpu_load_info(info);
-//             fclose(file);
-//             return NULL;
-//         }
-
-//         // Calculate the total time and idle time from the first read
-//         total1 = user + nice + system + idle + iowait + irq + softirq + steal;
-//         idle_time1 = idle + iowait;
-
-//         // Sleep for a short time to allow for the next CPU measurement (100 ms)
-//         usleep(100000); // 100 milliseconds
-
-//         // Reset the file pointer to the beginning of the file for the second read
-//         rewind(file);
-
-//         // Second reading from /proc/stat
-//         for (int j = 0; j <= i; j++) {
-//             // Skip the first (j-1) CPUs
-//             if (fscanf(file, "cpu%*d %lu %lu %lu %lu %lu %lu %lu %lu", 
-//                        &user2, &nice2, &system2, &idle2, &iowait2, &irq2, &softirq2, &steal2) != 8) {
-//                 perror("Failed to read CPU data on second pass");
-//                 free_cpu_load_info(info);
-//                 fclose(file);
-//                 return NULL;
-//             }
-//         }
-
-//         // Calculate the total time and idle time from the second read
-//         total2 = user2 + nice2 + system2 + idle2 + iowait2 + irq2 + softirq2 + steal2;
-//         idle_time2 = idle2 + iowait2;
-
-//         // Calculate the differences in total time and idle time
-//         uint64_t total_diff = total2 - total1;
-//         uint64_t idle_diff = idle_time2 - idle_time1;
-
-//         // Avoid division by zero
-//         if (total_diff == 0) {
-//             info->loads[i] = 0.0f;
-//         } else {
-//             // Calculate CPU load for this core (1 - fraction of time spent idle)
-//             info->loads[i] = (float)(total_diff - idle_diff) / (float)total_diff;
-//         }
-//     }
-
-//     fclose(file);
-//     return info;
-// }
-
-/**
- * @brief Reads CPU stats from /proc/stat for all cores.
- * 
- * @param stats Array to store CPU times for each core.
- * @param num_cores Number of CPU cores to read.
- * @return int 0 on success, -1 on failure.
- */
-int read_cpu_stats(uint64_t (*stats)[8], int num_cores) {
-    FILE *file = fopen("/proc/stat", "r");
-    if (!file) {
-        perror("Failed to open /proc/stat");
-        return -1;
-    }
-
-    fscanf(file, "%*[^\n]\n");
-
-    char buffer[256];
-    for (int i = 0; i < num_cores; i++) {
-        if (fgets(buffer, sizeof(buffer), file) == NULL || 
-            sscanf(buffer, "cpu%*d %lu %lu %lu %lu %lu %lu %lu %lu",
-                   &stats[i][0], &stats[i][1], &stats[i][2], &stats[i][3],
-                   &stats[i][4], &stats[i][5], &stats[i][6], &stats[i][7]) != 8) {
-            perror("Failed to read CPU data");
-            fclose(file);
-            return -1;
+        wclear(left_win);
+        wclear(right_win);
+        
+        display_process_info(right_win, processes, num_processes, start, selected, term_height, term_width);
+        // Get CPU load information
+        cpu_load_info_t *info = get_cpu_load_info();
+        if (info == NULL) {
+            mvprintw(0, 0, "Failed to retrieve CPU load information.");
+            wrefresh(left_win);
+            wrefresh(right_win);
+            sleep(1);
+            continue;
         }
-    }
 
-    fclose(file);
+        uint64_t new_total_cpu_time;
+        read_total_cpu_time(&new_total_cpu_time);
+        num_processes = read_process_info(processes, process_time_table, new_total_cpu_time - last_total_cpu_time, info->num_cores);
+        last_total_cpu_time = new_total_cpu_time;
+        for (int i = 0; i < num_processes - 1; i++) {
+            for (int j = 0; j < num_processes - i - 1; j++) {
+                if (processes[j].cpu_usage < processes[j + 1].cpu_usage) {
+                    ProcessInfo temp = processes[j];
+                    processes[j] = processes[j + 1];
+                    processes[j + 1] = temp;
+                }
+            }
+        }
+
+        // uncomment to artificially limit the number of CPUs shown
+        // info->num_cores = 8;
+
+        // Get memory information
+        MemInfo mem_info;
+        get_mem_info(&mem_info);
+        mem_usage = (float)mem_info.used_mem / (float)mem_info.total_mem;
+        swap_usage = (float)mem_info.used_swap / (float)mem_info.total_swap;
+
+        wclear(left_win);  // Clear the screen before updating
+
+        // Additional system information
+        float load1, load5, load15;
+        get_load_average(&load1, &load5, &load15);
+        double uptime;
+        get_uptime(&uptime);
+        int tasks = get_task_count();
+        
+        wclear(left_win);
+
+        // Display task summary and load averages
+        mvwprintw(left_win,0, 0, "Tasks: %d total", tasks);
+        mvwprintw(left_win,1, 0, "Load average: %.2f, %.2f, %.2f", load1, load5, load15);
+        mvwprintw(left_win,2, 0, "Uptime: %.0f seconds", uptime);
+
+        // Draw CPU usage bars
+        draw_cpu_bars(left_win, 4, 2, info->loads, info->num_cores, bar_width);
+
+        // Draw memory usage bar
+        draw_memory_bar(left_win, info->num_cores + 5, 2, mem_usage, "Mem", bar_width);
+
+        // Draw swap usage bar
+        draw_memory_bar(left_win, info->num_cores + 6, 2, swap_usage, "Swap", bar_width);
+
+        // Display detailed memory and swap info
+        mvwprintw(left_win, info->num_cores + 10 - 2, 2, "Total Memory: %.1f GB", mem_info.total_mem / 1024.0 / 1024.0);
+        mvwprintw(left_win, info->num_cores + 11 - 2, 2, "Used Memory: %lld MB", mem_info.used_mem / 1024);
+        mvwprintw(left_win, info->num_cores + 12 - 2, 2, "Free Memory: %lld MB", mem_info.free_mem / 1024);
+        mvwprintw(left_win, info->num_cores + 13 - 2, 2, "Cached Memory: %lld MB", mem_info.cached_mem / 1024);
+        mvwprintw(left_win, info->num_cores + 14 - 2, 2, "Total Swap: %lld MB", mem_info.total_swap / 1024);
+        mvwprintw(left_win, info->num_cores + 15 - 2, 2, "Used Swap: %lld MB", mem_info.used_swap / 1024);
+
+        wrefresh(left_win);  // Update the screen
+        wrefresh(right_win); // Update the screen
+
+        free_cpu_load_info(info);
+
+        sleep(1);  // Update every second
+    }
+    delwin(left_win);
+    delwin(right_win);
+    endwin();
+
     return 0;
 }
 
-/**
- * @brief Retrieves CPU load information for all cores.
- * 
- * Allocates and returns a structure containing the number of cores and an array
- * of CPU load percentages. The user must call free_cpu_load_info() to release memory.
- * 
- * @return cpu_load_info_t* A pointer to the cpu_load_info_t structure, or NULL on error.
- */
-cpu_load_info_t* get_cpu_load_info() {
-    int num_cores = 0;
-    char buffer[256];
-    
-    // Open /proc/stat to count the number of CPU cores
-    FILE *file = fopen("/proc/stat", "r");
-    if (!file) {
-        perror("Failed to open /proc/stat");
-        return NULL;
-    }
 
-    fscanf(file, "%*[^\n]\n");
-
-    // Count CPU cores by checking lines starting with "cpu" followed by a number
-    while (fgets(buffer, sizeof(buffer), file)) {
-        if (strncmp(buffer, "cpu", 3) == 0 && buffer[3] != ' ') {
-            num_cores++;
-        } else {
-            break;
-        }
-    }
-
-    fclose(file);
-
-    if (num_cores == 0) {
-        fprintf(stderr, "No CPU cores found\n");
-        return NULL;
-    }
-
-    // Allocate the cpu_load_info_t structure
-    cpu_load_info_t *info = (cpu_load_info_t *)malloc(sizeof(cpu_load_info_t));
-    if (!info) {
-        perror("Failed to allocate cpu_load_info_t");
-        return NULL;
-    }
-
-    // Allocate memory for the loads array
-    info->loads = (float *)malloc(num_cores * sizeof(float));
-    if (!info->loads) {
-        perror("Failed to allocate loads array");
-        free(info);
-        return NULL;
-    }
-
-    // Set the number of cores in the structure
-    info->num_cores = num_cores;
-
-    // Allocate arrays to store CPU times (user, nice, system, idle, etc.)
-    uint64_t stats1[num_cores][8], stats2[num_cores][8];
-
-    // Read first snapshot of CPU stats
-    if (read_cpu_stats(stats1, num_cores) == -1) {
-        free_cpu_load_info(info);
-        return NULL;
-    }
-
-    // Sleep for a short time (100ms) to take a second measurement
-    usleep(4*250000);
-
-    // Read second snapshot of CPU stats
-    if (read_cpu_stats(stats2, num_cores) == -1) {
-        free_cpu_load_info(info);
-        return NULL;
-    }
-
-    // Calculate CPU loads for each core
+// Function to draw CPU usage bars
+void draw_cpu_bars(WINDOW *win, int y, int x, float *cpu_usages, int num_cores, int bar_width) {
     for (int i = 0; i < num_cores; i++) {
-        uint64_t total1 = 0, total2 = 0, idle_time1 = 0, idle_time2 = 0;
-
-        // Calculate total times and idle times from the snapshots
-        for (int j = 0; j < 8; j++) {
-            total1 += stats1[i][j];
-            total2 += stats2[i][j];
+        mvwprintw(win, y + i, x, "CPU %2d: |", i);
+        int usage_bar = (int)(cpu_usages[i] * bar_width); // Scale usage to fit bar
+        wattron(win, COLOR_PAIR(1));
+        for (int j = 0; j < usage_bar; j++) {
+            wprintw(win, "|");
         }
-
-        idle_time1 = stats1[i][3] + stats1[i][4]; // idle + iowait
-        idle_time2 = stats2[i][3] + stats2[i][4];
-
-        uint64_t total_diff = total2 - total1;
-        uint64_t idle_diff = idle_time2 - idle_time1;
-
-        if (total_diff == 0) {
-            info->loads[i] = 0.0f;
-        } else {
-            info->loads[i] = (float)(total_diff - idle_diff) / (float)total_diff;
+        wattroff(win, COLOR_PAIR(1));
+        for (int j = 0; j < bar_width - usage_bar; j++) {
+            wprintw(win, " ");
         }
+        wprintw(win, "|");
+        wprintw(win, " %.1f%%", cpu_usages[i] * 100);
     }
-
-    return info;
+    wrefresh(win);
 }
 
-int get_mem_info(MemInfo *mem_info) {
-    FILE *file = fopen("/proc/meminfo", "r");
-    if (file == NULL) {
-        perror("Failed to open /proc/meminfo");
-        return -1;
-    }
-
-    char line[256];
-    int fields_found = 0;
-
-    while (fgets(line, sizeof(line), file)) {
-        if (strncmp(line, "MemTotal:", 9) == 0) {
-            sscanf(line + 9, "%lld", &mem_info->total_mem);
-            fields_found++;
-        } else if (strncmp(line, "MemFree:", 8) == 0) {
-            sscanf(line + 8, "%lld", &mem_info->free_mem);
-            fields_found++;
-        } else if (strncmp(line, "Shmem:", 6) == 0) {
-            sscanf(line + 6, "%lld", &mem_info->shared_mem);
-            fields_found++;
-        } else if (strncmp(line, "MemAvailable:", 13) == 0) {
-            sscanf(line + 13, "%lld", &mem_info->available_mem);
-            fields_found++;
-        } else if (strncmp(line, "Buffers:", 8) == 0) {
-            sscanf(line + 8, "%lld", &mem_info->buffers_mem);
-            fields_found++;
-        } else if (strncmp(line, "Cached:", 7) == 0) {
-            sscanf(line + 7, "%lld", &mem_info->cached_mem);
-            fields_found++;
-        } else if (strncmp(line, "SwapTotal:", 10) == 0) {
-            sscanf(line + 10, "%lld", &mem_info->total_swap);
-            fields_found++;
-        } else if (strncmp(line, "SwapFree:", 9) == 0) {
-            sscanf(line + 9, "%lld", &mem_info->free_swap);
-            fields_found++;
-        }
-    }
-
-    fclose(file);
-
-    if (fields_found < 7) {
-        fprintf(stderr, "Error: Could not parse all required fields from /proc/meminfo\n");
-        return -1;
-    }
-
-    // Calculate used memory
-    mem_info->used_mem = mem_info->total_mem - mem_info->free_mem;// - mem_info->buffers_mem - mem_info->cached_mem;
-    
-    // Calculate used swap
-    mem_info->used_swap = mem_info->total_swap - mem_info->free_swap;
-
-    // Calculate percentages
-    mem_info->mem_in_use_percent = 100.0 * (float)mem_info->used_mem / (float)mem_info->total_mem;
-    if (mem_info->total_swap > 0) {
-        mem_info->swap_in_use_percent = 100.0 * (float)mem_info->used_swap / (float)mem_info->total_swap;
+// Function to draw memory or swap usage bars
+void draw_memory_bar(WINDOW *win, int y, int x, float usage, const char *label, int bar_width) {
+    mvwprintw(win, y, x, "%6s: |", label);
+    int usage_bar = (int)(usage * bar_width);  // Scale usage to fit bar
+    if (strcmp(label, "Mem") == 0) {
+        wattron(win, COLOR_PAIR(2));  // Memory bar in blue
     } else {
-        mem_info->swap_in_use_percent = 0.0;
+        wattron(win, COLOR_PAIR(3));  // Swap bar in red
+    }
+    for (int i = 0; i < usage_bar; i++) {
+        wprintw(win, "|");
+    }
+    if (strcmp(label, "Mem") == 0) {
+        wattroff(win, COLOR_PAIR(2));
+    } else {
+        wattroff(win, COLOR_PAIR(3));
+    }
+    for (int i = 0; i < bar_width - usage_bar; i++) {
+        wprintw(win, " ");
+    }
+    wprintw(win, "|");
+    wprintw(win, " %.1f%%", usage * 100);
+    wrefresh(win);
+}
+
+void display_process_info(WINDOW *win, ProcessInfo *processes, int num_processes, int start, int selected, int term_height, int term_width) {
+    // int row = 1;
+    adjust_layout(term_width);
+    wclear(win);
+     // Header row
+    mvwprintw(win, 0, 1, "%-*s %-*s %-*s %-*s %-*s",
+              pid_col_width, "PID",
+              user_col_width, "USER",
+              name_col_width, "NAME",
+              cpu_col_width, "CPU(%)",
+              mem_col_width, "MEM(KB)");
+
+    // Process rows
+    int row = 2;
+    for (int i = start; i < num_processes && row < term_height; i++) {
+        if (processes[i].cpu_usage > 50.0) {
+            if (i == selected) wattron(win, A_REVERSE);
+            wattron(win, COLOR_PAIR(3));  // Highlight high CPU usage
+        }
+
+        mvwprintw(win, row, 1, "%-*d %-*s %-*s %-*.2f %-*ld",
+                  pid_col_width, processes[i].pid,
+                  user_col_width, processes[i].user,
+                  name_col_width, processes[i].name,
+                  cpu_col_width, processes[i].cpu_usage,
+                  mem_col_width, processes[i].memory);
+
+        wattroff(win, COLOR_PAIR(3));
+        wattroff(win, A_REVERSE);
+        row++;
     }
 
-    return 0;
+    wrefresh(win);
 }
+
+void adjust_layout(int term_width) {
+    total_width = term_width/2 - 2; // Account for padding
+    pid_col_width = total_width * 0.15;  // 15% for PID
+    user_col_width = total_width * 0.20; // 20% for USER
+    name_col_width = total_width * 0.30; // 30% for NAME
+    cpu_col_width = total_width * 0.15;  // 15% for CPU
+    mem_col_width = total_width * 0.20;  // 20% for MEMORY
+}
+
