@@ -2,4 +2,5 @@
 main
 cpuusage_main
 sysmonitor
+sysmonitor_static
 htop-display
