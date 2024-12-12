@@ -20,6 +20,25 @@ typedef struct {
     long memory;
 } ProcessInfo;
 
+void get_username(uid_t uid, char *username, size_t size) {
+    FILE *passwd = fopen("/etc/passwd", "r");
+    if (!passwd) return;
+
+    char line[256];
+    while (fgets(line, sizeof(line), passwd)) {
+        char *token = strtok(line, ":");
+        char *user = token;
+        token = strtok(NULL, ":"); // Skip password
+        int user_id = atoi(strtok(NULL, ":"));
+        if (user_id == uid) {
+            strncpy(username, user, size - 1);
+            username[size - 1] = '\0';
+            break;
+        }
+    }
+    fclose(passwd);
+}
+
 void get_process_user(int pid, char *user) {
     char path[40], line[100];
     FILE *status_file;
@@ -47,13 +66,15 @@ void get_process_user(int pid, char *user) {
 
     fclose(status_file);
 
-    pw = getpwuid(uid);
-    if (pw == NULL) {
-        strcpy(user, "unknown");  // If username lookup fails, set to "unknown"
-    } else {
-        strncpy(user, pw->pw_name, 63);  // Copy the username into the user field
-        user[63] = '\0';  // Ensure null-termination
-    }
+    // pw = getpwuid(uid);
+    // if (pw == NULL) {
+    //     strcpy(user, "unknown");  // If username lookup fails, set to "unknown"
+    // } else {
+    //     strncpy(user, pw->pw_name, 63);  // Copy the username into the user field
+    //     user[63] = '\0';  // Ensure null-termination
+    // }
+    get_username(uid, user, 63);
+    user[63] = '\0';
 }
 // Function to calculate CPU usage of the process
 float get_cpu_usage(int pid, HashTable *table, uint64_t total_cpu_time_diff) {
