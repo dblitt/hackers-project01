@@ -43,7 +43,6 @@ void get_process_user(int pid, char *user) {
     char path[40], line[100];
     FILE *status_file;
     uid_t uid;
-    struct passwd *pw;
 
     // Construct the path to the /proc/[pid]/status file
     snprintf(path, sizeof(path), "/proc/%d/status", pid);
@@ -66,13 +65,6 @@ void get_process_user(int pid, char *user) {
 
     fclose(status_file);
 
-    // pw = getpwuid(uid);
-    // if (pw == NULL) {
-    //     strcpy(user, "unknown");  // If username lookup fails, set to "unknown"
-    // } else {
-    //     strncpy(user, pw->pw_name, 63);  // Copy the username into the user field
-    //     user[63] = '\0';  // Ensure null-termination
-    // }
     get_username(uid, user, 63);
     user[63] = '\0';
 }
