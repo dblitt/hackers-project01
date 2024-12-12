@@ -2,6 +2,7 @@ name: Makefile CI
 
 on:
   push:
+    branches:
     tags:
       # https://semver.org/#spec-item-2
       - 'v[0-9]+.[0-9]+.[0-9]+'
