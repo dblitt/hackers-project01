@@ -27,6 +27,8 @@ jobs:
 
   publish-release:
     name: "Publish Release"
+    permissions:
+      contents: write
     runs-on: ubuntu-24.04
     needs:
       - build
