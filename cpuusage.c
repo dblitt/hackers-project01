@@ -502,3 +502,62 @@ int read_total_cpu_time(uint64_t *total_cpu_time) {
 
     return 0;
 }
+
+/**
+ * @brief Converts memory of one type to desired type.
+ * Use the function like this: convert_mem([MemInfo pointer], convtype, and type being converted).
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param conv_type MEMCONVTYPE used for determining what to convert to. 'K' = kilobytes, 'M' = megabytes and 'G' = gigabytes.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
+ * 
+ * @return Returns converted value if it properly converts, -1 if it fails. 
+ */
+long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type) {
+    long long MEMTYPE = get_mem_type(&mem_info, type);
+    if (!mem_info) { return -1; }
+    switch (conv_type) {
+        case 'K': {
+            return mem_info; /* By default the data is already in kilobytes 
+            but implementing in case of possible use in the future */
+            break;
+        }
+        case 'M': {
+            return mem_info->MEMTYPE / 1024;
+            break;
+        }
+        case 'G': {
+            return mem_info->MEMTYPE / 1024 / 1024;
+        }
+        default: {
+            return -1;
+        }
+    }
+}
+
+/**
+ * @brief Takes enum type and converts it to a memory pointer. 
+ * Required for convert_mum function to work properly, as without it
+ * there would be no way of automatically identifying what type of data to convert.
+ *  
+ *@param mem_info Pointer to MemInfo
+ *@param MEMTYPES Type of memory being used when converting (e.g. used memory, total memory)
+ *
+ *@return Returns memory type if properly recieved, -1 if it fails.
+ */
+long long get_mem_type(MemInfo *mem_info, enum MEMTYPES type) {
+    if (!mem_info) { return -1; }
+    switch (type) {
+        case TOTALMEM: return mem_info->total_mem; break; 
+        case USEDMEM: return mem_info->used_mem; break;
+        case FREEMEM: return mem_info->free_mem; break;
+        case CACHEDMEM: return mem_info->cached_mem; break;
+        case BUFFERSMEM: return mem_info->buffers_mem; break;
+        case SHAREDMEM: return mem_info->shared_mem; break;
+        case AVAILMEM: return mem_info->available_mem; break;
+        case TOTALSWAP: return mem_info->total_swap; break;
+        case USEDSWAP: return mem_info->used_swap; break;
+        case FREESWAP: return mem_info->free_swap; break;
+        default: return -1;
+    }
+}

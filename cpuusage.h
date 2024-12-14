@@ -7,6 +7,21 @@
 #include <string.h>
 #include <unistd.h>
 
+#define MEMCONVTYPE 'K', 'M', 'G' 
+
+enum MEMTYPES {
+    TOTALMEM, /** Total physical memory (in kB) */
+    USEDMEM,      /** Used physical memory (in kB) */
+    FREEMEM,       /** Free physical memory (in kB) */
+    CACHEDMEM,     /** Cached memory (in kB) */
+    BUFFERSMEM,    /** Buffers memory (in kB) */
+    SHAREDMEM,    /** Shared memory (in kB) */
+    AVAILMEM,  /** Available memory (in kB) */
+    TOTALSWAP,      /** Total swap space (in kB) */
+    USEDSWAP,       /** Used swap space (in kB) */
+    FREESWAP,       /** Free swap space (in kB) */
+};
+
 /**
  * @brief Reads CPU statistics from /proc/stat and calculates the CPU
  * load by comparing idle and total times between two intervals.
@@ -34,6 +49,7 @@ typedef struct {
     long long free_swap;       /** Free swap space (in kB) */
     float mem_in_use_percent;  /** Memory usage percentage */
     float swap_in_use_percent; /** Swap usage percentage */
+    long long MEMTYPE; /** Needed for convert_mem function */
 } MemInfo;
 
 /**
@@ -87,5 +103,28 @@ int read_process_cpu_time(pid_t pid, uint64_t *time);
  * @return int 0 on success, -1 on failure.
  */
 int read_total_cpu_time(uint64_t *total_cpu_time);
+
+/**
+ * @brief Converts memory of one type to desired type.
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param conv_type MEMCONVTYPE used for determining what to convert to. 'K' = kilobytes, 'M' = megabytes and 'G' = gigabytes.
+ * @param MEMTYPES Type of pointer used for value.
+ * 
+ * @return Returns converted value if it properly converts, -1 if it fails.
+ */
+long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type);
+
+/**
+ * @brief Takes enum type and converts it to a memory pointer. 
+ * Required for convert_mum function to work properly, as without it
+ * there would be no way of automatically identifying what type of data to convert.
+ *  
+ *@param mem_info Pointer to MemInfo
+ *@param MEMTYPES Type of memory being used when converting (e.g. used memory, total memory)
+ *
+ *@return Returns memory type if properly recieved, -1 if it fails.
+ */
+long long get_mem_type(MemInfo *mem_info, enum MEMTYPES type);
 
 #endif
