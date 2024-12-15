@@ -527,7 +527,7 @@ long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type) {
             break;
         }
         case 'G': {
-            return mem_info->MEMTYPE / 1024 / 1024;
+            return mem_info->MEMTYPE / 1024 / 1024.0;
         }
         default: {
             return -1;
