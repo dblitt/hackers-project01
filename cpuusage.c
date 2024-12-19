@@ -514,7 +514,21 @@ int read_total_cpu_time(uint64_t *total_cpu_time) {
  * @return Returns converted value if it properly converts, -1 if it fails. 
  */
 long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type) {
-    long long MEMTYPE = get_mem_type(&mem_info, type);
+    long long MEMTYPE;
+    switch (type) {
+        case TOTALMEM: MEMTYPE = mem_info->total_mem; break; 
+        case USEDMEM: MEMTYPE = mem_info->used_mem; break;
+        case FREEMEM: MEMTYPE = mem_info->free_mem; break;
+        case CACHEDMEM: MEMTYPE = mem_info->cached_mem; break;
+        case BUFFERSMEM: MEMTYPE = mem_info->buffers_mem; break;
+        case SHAREDMEM: MEMTYPE = mem_info->shared_mem; break;
+        case AVAILMEM: MEMTYPE = mem_info->available_mem; break;
+        case TOTALSWAP: MEMTYPE = mem_info->total_swap; break;
+        case USEDSWAP: MEMTYPE = mem_info->used_swap; break;
+        case FREESWAP: MEMTYPE = mem_info->free_swap; break;
+        default: return -1;
+    }
+    
     if (!mem_info) { return -1; }
     switch (conv_type) {
         case 'K': {
@@ -523,41 +537,14 @@ long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type) {
             break;
         }
         case 'M': {
-            return mem_info->MEMTYPE / 1024;
+            return MEMTYPE / 1024;
             break;
         }
         case 'G': {
-            return mem_info->MEMTYPE / 1024 / 1024.0;
+            return MEMTYPE / 1024 / 1024.0;
         }
         default: {
             return -1;
         }
-    }
-}
-
-/**
- * @brief Takes enum type and converts it to a memory pointer. 
- * Required for convert_mum function to work properly, as without it
- * there would be no way of automatically identifying what type of data to convert.
- *  
- *@param mem_info Pointer to MemInfo
- *@param MEMTYPES Type of memory being used when converting (e.g. used memory, total memory)
- *
- *@return Returns memory type if properly recieved, -1 if it fails.
- */
-long long get_mem_type(MemInfo *mem_info, enum MEMTYPES type) {
-    if (!mem_info) { return -1; }
-    switch (type) {
-        case TOTALMEM: return mem_info->total_mem; break; 
-        case USEDMEM: return mem_info->used_mem; break;
-        case FREEMEM: return mem_info->free_mem; break;
-        case CACHEDMEM: return mem_info->cached_mem; break;
-        case BUFFERSMEM: return mem_info->buffers_mem; break;
-        case SHAREDMEM: return mem_info->shared_mem; break;
-        case AVAILMEM: return mem_info->available_mem; break;
-        case TOTALSWAP: return mem_info->total_swap; break;
-        case USEDSWAP: return mem_info->used_swap; break;
-        case FREESWAP: return mem_info->free_swap; break;
-        default: return -1;
     }
 }

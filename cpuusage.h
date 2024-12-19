@@ -106,25 +106,14 @@ int read_total_cpu_time(uint64_t *total_cpu_time);
 
 /**
  * @brief Converts memory of one type to desired type.
+ * Use the function like this: convert_mem([MemInfo pointer], convtype, and type being converted).
  * 
  * @param mem_info Pointer to MemInfo to source data from.
  * @param conv_type MEMCONVTYPE used for determining what to convert to. 'K' = kilobytes, 'M' = megabytes and 'G' = gigabytes.
- * @param MEMTYPES Type of pointer used for value.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
  * 
- * @return Returns converted value if it properly converts, -1 if it fails.
+ * @return Returns converted value if it properly converts, -1 if it fails. 
  */
 long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type);
-
-/**
- * @brief Takes enum type and converts it to a memory pointer. 
- * Required for convert_mum function to work properly, as without it
- * there would be no way of automatically identifying what type of data to convert.
- *  
- *@param mem_info Pointer to MemInfo
- *@param MEMTYPES Type of memory being used when converting (e.g. used memory, total memory)
- *
- *@return Returns memory type if properly recieved, -1 if it fails.
- */
-long long get_mem_type(MemInfo *mem_info, enum MEMTYPES type);
 
 #endif
