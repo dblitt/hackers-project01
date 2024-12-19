@@ -502,3 +502,49 @@ int read_total_cpu_time(uint64_t *total_cpu_time) {
 
     return 0;
 }
+
+/**
+ * @brief Converts memory of one type to desired type.
+ * Use the function like this: convert_mem([MemInfo pointer], convtype, and type being converted).
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param conv_type MEMCONVTYPE used for determining what to convert to. 'K' = kilobytes, 'M' = megabytes and 'G' = gigabytes.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
+ * 
+ * @return Returns converted value if it properly converts, -1 if it fails. 
+ */
+long long convert_mem(MemInfo *mem_info, char conv_type, enum MEMTYPES type) {
+    long long MEMTYPE;
+    switch (type) {
+        case TOTALMEM: MEMTYPE = mem_info->total_mem; break; 
+        case USEDMEM: MEMTYPE = mem_info->used_mem; break;
+        case FREEMEM: MEMTYPE = mem_info->free_mem; break;
+        case CACHEDMEM: MEMTYPE = mem_info->cached_mem; break;
+        case BUFFERSMEM: MEMTYPE = mem_info->buffers_mem; break;
+        case SHAREDMEM: MEMTYPE = mem_info->shared_mem; break;
+        case AVAILMEM: MEMTYPE = mem_info->available_mem; break;
+        case TOTALSWAP: MEMTYPE = mem_info->total_swap; break;
+        case USEDSWAP: MEMTYPE = mem_info->used_swap; break;
+        case FREESWAP: MEMTYPE = mem_info->free_swap; break;
+        default: return -1;
+    }
+    
+    if (!mem_info) { return -1; }
+    switch (conv_type) {
+        case 'K': {
+            return mem_info; /* By default the data is already in kilobytes 
+            but implementing in case of possible use in the future */
+            break;
+        }
+        case 'M': {
+            return MEMTYPE / 1024;
+            break;
+        }
+        case 'G': {
+            return MEMTYPE / 1024 / 1024.0;
+        }
+        default: {
+            return -1;
+        }
+    }
+}
