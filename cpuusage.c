@@ -502,3 +502,63 @@ int read_total_cpu_time(uint64_t *total_cpu_time) {
 
     return 0;
 }
+
+/**
+ * @brief Converts memory of one type to desired type.
+ * Required for format_mem function.
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
+ * 
+ * @return Returns converted value if it properly converts, -1 if it fails. 
+ */
+long long convert_mem(MemInfo *mem_info, enum MEMTYPES type) {
+    if (!mem_info) { return -1; }
+
+    long long MEMTYPE;
+    switch (type) {
+        case TOTALMEM: MEMTYPE = mem_info->total_mem; break; 
+        case USEDMEM: MEMTYPE = mem_info->used_mem; break;
+        case FREEMEM: MEMTYPE = mem_info->free_mem; break;
+        case CACHEDMEM: MEMTYPE = mem_info->cached_mem; break;
+        case BUFFERSMEM: MEMTYPE = mem_info->buffers_mem; break;
+        case SHAREDMEM: MEMTYPE = mem_info->shared_mem; break;
+        case AVAILMEM: MEMTYPE = mem_info->available_mem; break;
+        case TOTALSWAP: MEMTYPE = mem_info->total_swap; break;
+        case USEDSWAP: MEMTYPE = mem_info->used_swap; break;
+        case FREESWAP: MEMTYPE = mem_info->free_swap; break;
+        default: return -1;
+    }
+
+    return MEMTYPE / 1024;
+}
+
+/**
+ * @brief Automatically returns a formatted version of the memory. 
+ * 
+ * If it's less than a gigabyte (1000 MBs in this case, as something lime 1015 MBS doesn't look good),
+ * it's displayed with up two decimal points, while if it's less than that it's displayed with up to a single decimal point.
+ * This function uses the convert_mem function and will not work without it.
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
+ * 
+ * @return -1 if it fails to convert.
+ */
+int format_mem(MemInfo *mem_info, enum MEMTYPES type) {
+    if (!mem_info) { 
+        return -1; 
+    }
+    long long mem = convert_mem(mem_info, type);
+    float printed_mem = (float)mem; // Possible accuracy loss when converting to a float but not much can be done about it
+
+    if (printed_mem >= 1000) {
+        printf("%.2f GB", printed_mem);
+    } else if (printed_mem < 1000) {
+        printf("%.1f MB", printed_mem);
+    } else { 
+        return -1;
+    }
+    
+    return 0;
+}

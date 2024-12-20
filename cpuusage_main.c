@@ -13,19 +13,19 @@ int main() {
     MemInfo mem_info;
 
     get_mem_info(&mem_info);
-    printf("Total Memory: %lld MB\n", mem_info.total_mem / 1024);
-    printf("Total Memory: %.1f GB\n", mem_info.total_mem / 1024 / 1024.0);
-    printf("Used Memory: %lld MB\n", mem_info.used_mem / 1024);
-    printf("Free Memory: %lld MB\n", mem_info.free_mem / 1024);
-    printf("Cached Memory: %lld MB\n", mem_info.cached_mem / 1024);
-    printf("Buffers: %lld MB\n", mem_info.buffers_mem / 1024);
-    printf("Total Swap: %lld MB\n", mem_info.total_swap / 1024);
-    printf("Used Swap: %lld MB\n", mem_info.used_swap / 1024);
-    printf("Free Swap: %lld MB\n", mem_info.free_swap / 1024);
+    printf("Total Memory: %s\n", format_mem(&mem_info, TOTALMEM));
+    printf("Total Memory: %s\n", format_mem(&mem_info, TOTALMEM));
+    printf("Used Memory: %s\n", format_mem(&mem_info, USEDMEM));
+    printf("Free Memory: %s\n", format_mem(&mem_info, FREEMEM));
+    printf("Cached Memory: %s\n", format_mem(&mem_info, CACHEDMEM));
+    printf("Buffers: %s\n", format_mem(&mem_info, BUFFERSMEM));
+    printf("Total Swap: %s\n", format_mem(&mem_info, TOTALSWAP));
+    printf("Used Swap: %s\n", format_mem(&mem_info, USEDSWAP));
+    printf("Free Swap: %s\n", format_mem(&mem_info, FREESWAP));
     printf("Memory In Use: %.2f%%\n", mem_info.mem_in_use_percent);
     printf("Swap In Use: %.2f%%\n", mem_info.swap_in_use_percent);
     printf("htop %lld MB\n", (mem_info.used_mem - mem_info.buffers_mem - mem_info.cached_mem) / 1024);
-    printf("available mem %lld MB\n", mem_info.available_mem / 1024);
+    printf("available mem %s\n", format_mem(&mem_info, AVAILMEM));
     printf("total - available mem %lld MB\n", (mem_info.total_mem - mem_info.available_mem) / 1024);
 
     printf("getting load for all cpu cores\n");

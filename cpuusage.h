@@ -7,6 +7,20 @@
 #include <string.h>
 #include <unistd.h>
 
+
+enum MEMTYPES {
+    TOTALMEM, /** Total physical memory (in kB) */
+    USEDMEM,      /** Used physical memory (in kB) */
+    FREEMEM,       /** Free physical memory (in kB) */
+    CACHEDMEM,     /** Cached memory (in kB) */
+    BUFFERSMEM,    /** Buffers memory (in kB) */
+    SHAREDMEM,    /** Shared memory (in kB) */
+    AVAILMEM,  /** Available memory (in kB) */
+    TOTALSWAP,      /** Total swap space (in kB) */
+    USEDSWAP,       /** Used swap space (in kB) */
+    FREESWAP,       /** Free swap space (in kB) */
+};
+
 /**
  * @brief Reads CPU statistics from /proc/stat and calculates the CPU
  * load by comparing idle and total times between two intervals.
@@ -34,6 +48,7 @@ typedef struct {
     long long free_swap;       /** Free swap space (in kB) */
     float mem_in_use_percent;  /** Memory usage percentage */
     float swap_in_use_percent; /** Swap usage percentage */
+    long long MEMTYPE; /** Needed for convert_mem function */
 } MemInfo;
 
 /**
@@ -87,5 +102,28 @@ int read_process_cpu_time(pid_t pid, uint64_t *time);
  * @return int 0 on success, -1 on failure.
  */
 int read_total_cpu_time(uint64_t *total_cpu_time);
+
+/**
+ * @brief Converts memory of one type to desired type.
+ * Required for format_mem function.
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
+ * 
+ * @return Returns converted value if it properly converts, -1 if it fails. 
+ */
+long long convert_mem(MemInfo *mem_info, enum MEMTYPES type);
+
+/**
+ * @brief Automatically returns a formatted version of the memory. 
+ * 
+ * If it's less than a gigabyte (1000 MBs in this case, as something lime 1015 MBS doesn't look good),
+ * it's displayed with up two decimal points, while if it's less than that it's displayed with up to a single decimal point.
+ * This function uses the convert_mem function and will not work without it.
+ * 
+ * @param mem_info Pointer to MemInfo to source data from.
+ * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
+ */
+int format_mem(MemInfo *mem_info, enum MEMTYPES type);
 
 #endif
