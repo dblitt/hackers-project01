@@ -559,4 +559,6 @@ int format_mem(MemInfo *mem_info, enum MEMTYPES type) {
     } else { 
         return -1;
     }
+    
+    return 0;
 }
