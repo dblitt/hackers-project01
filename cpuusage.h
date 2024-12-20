@@ -124,6 +124,6 @@ long long convert_mem(MemInfo *mem_info, enum MEMTYPES type);
  * @param mem_info Pointer to MemInfo to source data from.
  * @param type The type of data being converted (e.g usable memory). A full list of types can be seen in cpuusage.h.
  */
-char* format_mem(MemInfo *mem_info, enum MEMTYPES type);
+int format_mem(MemInfo *mem_info, enum MEMTYPES type);
 
 #endif

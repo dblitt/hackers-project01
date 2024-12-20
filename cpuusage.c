@@ -545,14 +545,18 @@ long long convert_mem(MemInfo *mem_info, enum MEMTYPES type) {
  * 
  * @return -1 if it fails to convert.
  */
-char* format_mem(MemInfo *mem_info, enum MEMTYPES type) {
-    if (!mem_info) { return -1; }
-    long long mem = convert_mem(&mem_info, type);
+int format_mem(MemInfo *mem_info, enum MEMTYPES type) {
+    if (!mem_info) { 
+        return -1; 
+    }
+    long long mem = convert_mem(mem_info, type);
     float printed_mem = (float)mem; // Possible accuracy loss when converting to a float but not much can be done about it
 
     if (printed_mem >= 1000) {
         printf("%.2f GB", printed_mem);
     } else if (printed_mem < 1000) {
         printf("%.1f MB", printed_mem);
-    } else { return -1; }
+    } else { 
+        return -1;
+    }
 }
